@@ -1,0 +1,36 @@
+services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: dualis-postgres
+    environment:
+      POSTGRES_DB: dualis_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dualis_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dualis-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/dualis_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: secretpassword
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
