@@ -1,33 +1,26 @@
-# Backlog de Historias de Usuario (HUs) – Dualis
+# Backlog de Historias de Usuario (HUs) – Dualis Server
 
-Este documento centraliza las Historias de Usuario del proyecto **Dualis**, organizadas por fases para el desarrollo del Producto Mínimo Viable (MVP) y futuras extensiones.
+Este documento centraliza las Historias de Usuario del proyecto **Dualis Server**, sincronizado con el tablero de GitHub Projects.
 
 ---
 
-## Fase 1: MVP (Core Funcional)
+## 📊 Estado de las Historias de Usuario
 
-| ID | Historia de Usuario | Descripción / Objetivo | Criterio de Aceptación Clave |
+| ID | Historia de Usuario | Descripción / Objetivo | Estado Actual |
 |---|---|---|---|
-| **HU01** | Autenticación y Registro | Registro e inicio de sesión de usuarios de forma segura. | JWT generado correctamente, contraseñas encriptadas. |
-| **HU02** | Gestión de Perfil | Administración de datos personales, moneda preferida y preferencias. | Permite actualizar perfil y configurar moneda base. |
-| **HU03** | Creación de Espacios | Crear espacios Financieros (Individuales o Compartidos en pareja). | Creación de espacios e invitación a pareja vía correo/código. |
-| **HU04** | Configuración de Ingresos | Registro de ingresos recurrentes/fijos para cálculo proporcional. | Permite definir ingresos mensuales para reglas de reparto. |
-| **HU05** | Gestión de Cuentas | CRUD de cuentas financieras (Débito, Crédito, Efectivo, Inversión). | Modificación de saldos iniciales y asociación a Espacios. |
-| **HU06** | Registro de Transacciones | Registro de ingresos, gastos y transferencias entre cuentas. | Categorización (Indispensable / No Indispensable). |
-| **HU07** | Motor de Repartición (Split) | Aplicación de reglas de división de gastos en pareja. | Reglas de división: 50/50, proporcional o montos fijos. |
-| **HU08** | Dashboard Básico | Visualización del resumen de saldos, gastos del mes y estado actual. | Gráficos simples e indicadores de flujo de caja del espacio. |
-
----
-
-## Fase 2: Post-MVP (Features Avanzados & ML)
-
-| ID | Historia de Usuario | Descripción / Objetivo |
-|---|---|---|
-| **HU09** | Transacciones Recurrentes | Automatización de gastos fijos y suscripciones. |
-| **HU10** | Módulo de Metas de Ahorro | Definición y seguimiento de metas individuales y en pareja. |
-| **HU11** | Modos de Ahorro Gamificados | Alternancia entre modos (Ahorro, Normal, Crecimiento) con ajustes de presupuesto. |
-| **HU12** | OCR para Comprobantes | Escaneo automático de boletas/facturas para registro de gastos. |
-| **HU13** | Notificaciones Push | Alertas de presupuestos excedidos, pagos pendientes o aportes de la pareja. |
-| **HU14** | Reportes Avanzados | Exportación de reportes financieros en PDF y Excel. |
-| **HU15** | Copiloto Financiero (IA) | Recomendaciones personalizadas basadas en patrones de gasto e inversión. |
-| **HU16** | Proyecciones y Flujo de Caja | Análisis predictivo del saldo futuro según comportamiento financiero. |
+| **HU05** | Registro de Cuentas | CRUD de cuentas financieras (Débito, Crédito, Efectivo, Inversión). | ✅ **Done** (PR #17) |
+| **HU07** | Registro de Transacción | Registro de ingresos, gastos y transferencias con actualización de saldos. | ✅ **Done** (PR #18) |
+| **HU08** | Reglas de División (Split) | Reglas de división en pareja (50/50, Proporcional por Ingresos, %, Fijo) y cálculo de deudas. | ✅ **Done** (Implementado en `feature/split-engine`) |
+| **HU01** | Registro e Inicio de Sesión | Autenticación y registro seguro de usuarios. | ⏳ **Todo** |
+| **HU02** | Inicio de Sesión y JWT | Autenticación basada en Tokens JWT y filtros de seguridad. | ⏳ **Todo** |
+| **HU03** | Gestión de Espacios (Workspaces) | Creación y administración de espacios individuales y compartidos. | ⏳ **Todo** |
+| **HU04** | Vinculación de Pareja | Invitación y vinculación de pareja a un workspace compartido. | ⏳ **Todo** |
+| **HU06** | Presupuesto Mensual por Categoría | Definición y control de límites de gasto mensuales por categoría. | ⏳ **Todo** |
+| **HU09** | Balance de Deudas | Vista agregada y liquidación de saldos pendientes de pareja. | ⏳ **Todo** |
+| **HU10** | Dashboard de Salud Financiera | Resumen de saldos, flujo de caja e indicadores financieros. | ⏳ **Todo** |
+| **HU11** | Sincronización de Datos | Sincronización offline/online y consistencia de datos. | ⏳ **Todo** |
+| **HU12** | Escaneo de Recibos (OCR) | Lectura automática de boletas/facturas para registro de gastos. | 📋 **Backlog** |
+| **HU13** | Transacciones Recurrentes | Automatización de gastos fijos y suscripciones. | 📋 **Backlog** |
+| **HU14** | Metas de Ahorro Compartidas | Definición y seguimiento de metas de ahorro en pareja. | 📋 **Backlog** |
+| **HU15** | Notificaciones Push | Alertas de presupuestos excedidos y pagos pendientes. | 📋 **Backlog** |
+| **HU16** | Exportación de Reportes | Exportación de reportes financieros. | 📋 **Backlog** |
