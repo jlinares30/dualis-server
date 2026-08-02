@@ -13,11 +13,11 @@ Este documento centraliza las Historias de Usuario del proyecto **Dualis Server*
 | **HU08** | Reglas de División (Split) | Reglas de división en pareja (50/50, Proporcional por Ingresos, %, Fijo) y cálculo de deudas. | ✅ **Done** (PR en `feature/split-engine`) |
 | **HU06** | Presupuesto Mensual por Categoría | Definición de límites mensuales y control de gasto en tiempo real. | ✅ **Done** (PR en `feature/budgets`) |
 | **Categorías** | Módulo de Categorías | Categorías estándar del sistema y personalizadas por espacio. | ✅ **Done** (PR en `feature/categories`) |
-| **HU03** | Gestión de Espacios (Workspaces) | Creación y administración de espacios individuales y compartidos. | ✅ **Done** (Implementado en `feature/workspaces`) |
-| **HU04** | Vinculación de Pareja | Invitación y vinculación de pareja a un workspace compartido vía código. | ✅ **Done** (Implementado en `feature/workspaces`) |
+| **HU03** | Gestión de Espacios (Workspaces) | Creación y administración de espacios individuales y compartidos. | ✅ **Done** (PR en `feature/workspaces`) |
+| **HU04** | Vinculación de Pareja | Invitación y vinculación de pareja a un workspace compartido vía código. | ✅ **Done** (PR en `feature/workspaces`) |
+| **HU09** | Balance de Deudas | Vista agregada y liquidación de saldos pendientes de pareja. | ✅ **Done** (Implementado en `feature/settlements`) |
 | **HU01** | Registro e Inicio de Sesión | Autenticación y registro seguro de usuarios. | ⏳ **Todo** |
 | **HU02** | Inicio de Sesión y JWT | Autenticación basada en Tokens JWT y filtros de seguridad. | ⏳ **Todo** |
-| **HU09** | Balance de Deudas | Vista agregada y liquidación de saldos pendientes de pareja. | ⏳ **Todo** |
 | **HU10** | Dashboard de Salud Financiera | Resumen de saldos, flujo de caja e indicadores financieros. | ⏳ **Todo** |
 | **HU11** | Sincronización de Datos | Sincronización offline/online y consistencia de datos. | ⏳ **Todo** |
 | **HU12** | Escaneo de Recibos (OCR) | Lectura automática de boletas/facturas para registro de gastos. | 📋 **Backlog** |
