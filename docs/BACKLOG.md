@@ -16,9 +16,9 @@ Este documento centraliza las Historias de Usuario del proyecto **Dualis Server*
 | **HU03** | Gestión de Espacios (Workspaces) | Creación y administración de espacios individuales y compartidos. | ✅ **Done** (PR en `feature/workspaces`) |
 | **HU04** | Vinculación de Pareja | Invitación y vinculación de pareja a un workspace compartido vía código. | ✅ **Done** (PR en `feature/workspaces`) |
 | **HU09** | Balance de Deudas | Vista agregada y liquidación de saldos pendientes de pareja. | ✅ **Done** (PR en `feature/settlements`) |
-| **HU10** | Dashboard de Salud Financiera | Resumen de saldos, flujo de caja e indicadores financieros. | ✅ **Done** (Implementado en `feature/dashboard`) |
-| **HU01** | Registro e Inicio de Sesión | Autenticación y registro seguro de usuarios. | ⏳ **Todo** |
-| **HU02** | Inicio de Sesión y JWT | Autenticación basada en Tokens JWT y filtros de seguridad. | ⏳ **Todo** |
+| **HU10** | Dashboard de Salud Financiera | Resumen de saldos, flujo de caja e indicadores financieros. | ✅ **Done** (PR en `feature/dashboard`) |
+| **HU01** | Registro e Inicio de Sesión | Autenticación y registro seguro de usuarios con contraseñas encriptadas. | ✅ **Done** (Implementado en `feature/auth`) |
+| **HU02** | Inicio de Sesión y JWT | Autenticación basada en Tokens JWT y filtro de seguridad stateless. | ✅ **Done** (Implementado en `feature/auth`) |
 | **HU11** | Sincronización de Datos | Sincronización offline/online y consistencia de datos. | ⏳ **Todo** |
 | **HU12** | Escaneo de Recibos (OCR) | Lectura automática de boletas/facturas para registro de gastos. | 📋 **Backlog** |
 | **HU13** | Transacciones Recurrentes | Automatización de gastos fijos y suscripciones. | 📋 **Backlog** |
