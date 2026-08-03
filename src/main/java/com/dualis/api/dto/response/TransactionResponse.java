@@ -60,6 +60,9 @@ public class TransactionResponse {
     @Schema(description = "Creation timestamp")
     private OffsetDateTime createdAt;
 
+    @Schema(description = "Update timestamp")
+    private OffsetDateTime updatedAt;
+
     public static TransactionResponse fromEntity(Transaction transaction) {
         return TransactionResponse.builder()
                 .id(transaction.getId())
@@ -76,6 +79,7 @@ public class TransactionResponse {
                 .description(transaction.getDescription())
                 .transactionDate(transaction.getTransactionDate())
                 .createdAt(transaction.getCreatedAt())
+                .updatedAt(transaction.getUpdatedAt())
                 .build();
     }
 }
