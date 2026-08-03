@@ -51,7 +51,7 @@ class DashboardServiceImplTest {
                 .name("Checking")
                 .balance(new BigDecimal("5000.00"))
                 .currency("USD")
-                .isActive(true)
+                .status(AccountStatus.ACTIVE)
                 .build();
     }
 
