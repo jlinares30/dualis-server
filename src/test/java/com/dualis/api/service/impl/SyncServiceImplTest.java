@@ -63,7 +63,7 @@ class SyncServiceImplTest {
                 .id(UUID.randomUUID())
                 .workspaceId(workspaceId)
                 .name("Checking")
-                .type(AccountType.DEBIT)
+                .type(AccountType.BANK)
                 .balance(new BigDecimal("1000.00"))
                 .currency("USD")
                 .createdAt(OffsetDateTime.now())
