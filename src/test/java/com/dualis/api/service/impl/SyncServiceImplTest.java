@@ -2,6 +2,7 @@ package com.dualis.api.service.impl;
 
 import com.dualis.api.domain.model.Account;
 import com.dualis.api.domain.model.AccountType;
+import com.dualis.api.domain.model.Transaction;
 import com.dualis.api.domain.repository.*;
 import com.dualis.api.dto.request.CreateTransactionRequest;
 import com.dualis.api.dto.request.SyncPullRequest;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -79,8 +81,11 @@ class SyncServiceImplTest {
                 .lastSyncedAt(null)
                 .build();
 
+        @SuppressWarnings("unchecked")
+        Specification<Transaction> anySpec = any(Specification.class);
+
         when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(account));
-        when(transactionRepository.findAll(any())).thenReturn(List.of());
+        when(transactionRepository.findAll(anySpec)).thenReturn(List.of());
         when(splitRuleRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of());
         when(budgetRepository.findAll()).thenReturn(List.of());
         when(categoryRepository.findByWorkspaceIdOrSystemDefault(workspaceId)).thenReturn(List.of());
@@ -107,8 +112,11 @@ class SyncServiceImplTest {
                 .offlineTransactions(List.of(txReq))
                 .build();
 
+        @SuppressWarnings("unchecked")
+        Specification<Transaction> anySpec = any(Specification.class);
+
         when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(account));
-        when(transactionRepository.findAll(any())).thenReturn(List.of());
+        when(transactionRepository.findAll(anySpec)).thenReturn(List.of());
 
         SyncResponse response = syncService.pushOfflineData(pushRequest);
 
