@@ -62,9 +62,17 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<WorkspaceResponse> getWorkspacesByUserEmail(String userEmail) {
-        return workspaceRepository.findWorkspacesByUserEmail(userEmail).stream()
+        List<Workspace> list = workspaceRepository.findWorkspacesByUserEmail(userEmail);
+        list.forEach(w -> {
+            if (!Boolean.TRUE.equals(w.getIsActive()) && w.getType() == WorkspaceType.INDIVIDUAL) {
+                w.setIsActive(true);
+                workspaceRepository.save(w);
+            }
+        });
+        return list.stream()
+                .filter(w -> Boolean.TRUE.equals(w.getIsActive()) || w.getType() == WorkspaceType.INDIVIDUAL)
                 .map(WorkspaceResponse::fromEntity)
                 .toList();
     }
@@ -99,6 +107,9 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Transactional
     public void deleteWorkspace(UUID id) {
         Workspace workspace = findEntityById(id);
+        if (workspace.getType() == WorkspaceType.INDIVIDUAL) {
+            return; // No desactivar nunca el workspace individual
+        }
         workspace.setIsActive(false);
         workspaceRepository.save(workspace);
     }

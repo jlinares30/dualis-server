@@ -15,6 +15,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
 
     Optional<Workspace> findByInvitationCode(String invitationCode);
 
-    @Query("SELECT DISTINCT w FROM Workspace w JOIN w.members m WHERE m.userEmail = :userEmail AND w.isActive = true")
+    @Query("SELECT DISTINCT w FROM Workspace w JOIN w.members m WHERE m.userEmail = :userEmail AND (w.isActive = true OR w.type = com.dualis.api.domain.model.WorkspaceType.INDIVIDUAL)")
     List<Workspace> findWorkspacesByUserEmail(@Param("userEmail") String userEmail);
 }
