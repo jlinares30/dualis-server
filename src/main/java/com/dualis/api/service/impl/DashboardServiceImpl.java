@@ -27,6 +27,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
     private final BudgetRepository budgetRepository;
+    private final WorkspaceRepository workspaceRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -45,7 +46,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .map(Account::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String currency = activeAccounts.isEmpty() ? "USD" : activeAccounts.get(0).getCurrency();
+        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
+        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() ? activeAccounts.get(0).getCurrency() : "PEN");
 
         // 2. Income & Expense Cash Flow
         Specification<Transaction> incomeSpec = TransactionSpecification.filterTransactions(
