@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.account.application.service.AccountApplicationService
 @RequiredArgsConstructor
 public class AccountServiceImpl implements AccountService {
 

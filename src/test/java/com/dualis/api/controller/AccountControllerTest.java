@@ -30,7 +30,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AccountController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = AccountController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AccountControllerTest {
 
@@ -42,6 +44,9 @@ class AccountControllerTest {
 
     @MockitoBean
     private AccountService accountService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private UUID accountId;
