@@ -1,14 +1,15 @@
-package com.dualis.api.service.impl;
+package com.dualis.api.modules.auth.application.service;
 
-import com.dualis.api.domain.model.User;
 import com.dualis.api.domain.model.UserRole;
-import com.dualis.api.domain.repository.UserRepository;
 import com.dualis.api.dto.request.LoginRequest;
 import com.dualis.api.dto.request.RegisterRequest;
 import com.dualis.api.dto.request.UpdateProfileRequest;
 import com.dualis.api.dto.response.AuthResponse;
 import com.dualis.api.dto.response.UserProfileResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
+import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
+import com.dualis.api.modules.auth.domain.model.User;
+import com.dualis.api.modules.auth.domain.repository.UserRepositoryPort;
 import com.dualis.api.security.JwtTokenProvider;
 import com.dualis.api.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -16,11 +17,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Deprecated in favor of com.dualis.api.modules.auth.application.service.AuthApplicationService
-@RequiredArgsConstructor
-public class AuthServiceImpl implements AuthService {
+import java.time.OffsetDateTime;
 
-    private final UserRepository userRepository;
+@Service
+@RequiredArgsConstructor
+public class AuthApplicationService implements ManageAuthUseCase, AuthService {
+
+    private final UserRepositoryPort userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -37,8 +40,10 @@ public class AuthServiceImpl implements AuthService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .baseCurrency(request.getBaseCurrency() != null ? request.getBaseCurrency() : "USD")
-                .role(UserRole.ROLE_USER)
+                .role(com.dualis.api.modules.auth.domain.model.UserRole.ROLE_USER)
                 .isActive(true)
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -82,30 +87,33 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUserProfile(String email) {
         User user = findUserByEmail(email);
-        return UserProfileResponse.fromEntity(user);
+        return mapToProfileResponse(user);
     }
 
     @Override
     @Transactional
     public UserProfileResponse updateProfile(String email, UpdateProfileRequest request) {
         User user = findUserByEmail(email);
-
-        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
-            user.setFirstName(request.getFirstName());
-        }
-        if (request.getLastName() != null && !request.getLastName().isBlank()) {
-            user.setLastName(request.getLastName());
-        }
-        if (request.getBaseCurrency() != null && !request.getBaseCurrency().isBlank()) {
-            user.setBaseCurrency(request.getBaseCurrency());
-        }
-
-        User updatedUser = userRepository.save(user);
-        return UserProfileResponse.fromEntity(updatedUser);
+        user.updateProfile(request.getFirstName(), request.getLastName(), request.getBaseCurrency());
+        User updated = userRepository.save(user);
+        return mapToProfileResponse(updated);
     }
 
     private User findUserByEmail(String email) {
         return userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    private UserProfileResponse mapToProfileResponse(User user) {
+        return UserProfileResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .baseCurrency(user.getBaseCurrency())
+                .role(user.getRole() != null ? user.getRole().name() : "ROLE_USER")
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
     }
 }
