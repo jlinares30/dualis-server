@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.category.application.service.CategoryApplicationService
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
 

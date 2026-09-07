@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CategoryController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = CategoryController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class CategoryControllerTest {
 
@@ -40,6 +42,9 @@ class CategoryControllerTest {
 
     @MockitoBean
     private CategoryService categoryService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private UUID categoryId;
