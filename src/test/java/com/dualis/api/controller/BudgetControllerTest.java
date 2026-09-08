@@ -27,7 +27,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(BudgetController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = BudgetController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class BudgetControllerTest {
 
@@ -39,6 +41,9 @@ class BudgetControllerTest {
 
     @MockitoBean
     private BudgetService budgetService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private UUID categoryId;

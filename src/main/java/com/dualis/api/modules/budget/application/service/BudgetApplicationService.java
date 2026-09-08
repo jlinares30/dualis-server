@@ -1,7 +1,8 @@
-package com.dualis.api.service.impl;
+package com.dualis.api.modules.budget.application.service;
 
-import com.dualis.api.domain.model.*;
-import com.dualis.api.domain.repository.BudgetRepository;
+import com.dualis.api.domain.model.BudgetStatus;
+import com.dualis.api.domain.model.Transaction;
+import com.dualis.api.domain.model.TransactionType;
 import com.dualis.api.domain.repository.TransactionRepository;
 import com.dualis.api.domain.specification.TransactionSpecification;
 import com.dualis.api.dto.request.CreateBudgetRequest;
@@ -9,7 +10,11 @@ import com.dualis.api.dto.request.UpdateBudgetRequest;
 import com.dualis.api.dto.response.BudgetProgressResponse;
 import com.dualis.api.dto.response.BudgetResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
+import com.dualis.api.modules.budget.application.usecase.ManageBudgetUseCase;
+import com.dualis.api.modules.budget.domain.model.Budget;
+import com.dualis.api.modules.budget.domain.repository.BudgetRepositoryPort;
 import com.dualis.api.service.BudgetService;
+import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -23,66 +28,80 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
-// Deprecated in favor of com.dualis.api.modules.budget.application.service.BudgetApplicationService
+@Service
 @RequiredArgsConstructor
-public class BudgetServiceImpl implements BudgetService {
+public class BudgetApplicationService implements ManageBudgetUseCase, BudgetService {
 
-    private final BudgetRepository budgetRepository;
+    private final BudgetRepositoryPort budgetRepository;
     private final TransactionRepository transactionRepository;
 
     @Override
     @Transactional
     public BudgetResponse createBudget(CreateBudgetRequest request) {
-        // Prevent duplicate budget for same workspace, category, month, and year
-        budgetRepository.findByWorkspaceIdAndCategoryIdAndPeriodMonthAndPeriodYear(
-                request.getWorkspaceId(), request.getCategoryId(), request.getPeriodMonth(), request.getPeriodYear()
-        ).ifPresent(existing -> {
+        List<Budget> existingList = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(
+                request.getWorkspaceId(), request.getPeriodMonth(), request.getPeriodYear()
+        );
+
+        boolean duplicate = existingList.stream().anyMatch(b ->
+                (b.getCategoryId() == null && request.getCategoryId() == null) ||
+                        (b.getCategoryId() != null && b.getCategoryId().equals(request.getCategoryId()))
+        );
+
+        if (duplicate) {
             throw new IllegalArgumentException("A budget for this category and period already exists in the workspace");
-        });
+        }
 
         Budget budget = Budget.builder()
                 .workspaceId(request.getWorkspaceId())
                 .categoryId(request.getCategoryId())
                 .name(request.getName())
-                .amount(request.getAmount())
-                .currency(request.getCurrency())
+                .amount(Money.of(request.getAmount(), request.getCurrency()))
                 .periodMonth(request.getPeriodMonth())
                 .periodYear(request.getPeriodYear())
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
                 .build();
 
-        Budget savedBudget = budgetRepository.save(budget);
-        return BudgetResponse.fromEntity(savedBudget);
+        Budget saved = budgetRepository.save(budget);
+        return mapToResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<BudgetResponse> getBudgetsByWorkspace(UUID workspaceId, Integer periodMonth, Integer periodYear) {
+        return getBudgetsByWorkspaceAndPeriod(workspaceId, periodMonth, periodYear);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BudgetResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer periodMonth, Integer periodYear) {
         List<Budget> budgets;
         if (periodMonth != null && periodYear != null) {
             budgets = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(workspaceId, periodMonth, periodYear);
         } else {
-            // Default to current month/year if omitted
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             int month = periodMonth != null ? periodMonth : now.getMonthValue();
             int year = periodYear != null ? periodYear : now.getYear();
             budgets = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(workspaceId, month, year);
         }
         return budgets.stream()
-                .map(BudgetResponse::fromEntity)
+                .map(this::mapToResponse)
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public BudgetResponse getBudgetById(UUID id) {
-        Budget budget = findEntityById(id);
-        return BudgetResponse.fromEntity(budget);
+        Budget budget = budgetRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+        return mapToResponse(budget);
     }
 
     @Override
     @Transactional(readOnly = true)
     public BudgetProgressResponse getBudgetProgress(UUID id) {
-        Budget budget = findEntityById(id);
+        Budget budget = budgetRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
 
         int month = budget.getPeriodMonth();
         int year = budget.getPeriodYear();
@@ -107,7 +126,7 @@ public class BudgetServiceImpl implements BudgetService {
                 .map(Transaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal limitAmount = budget.getAmount();
+        BigDecimal limitAmount = budget.getAmount() != null ? budget.getAmount().amount() : BigDecimal.ZERO;
         BigDecimal remainingAmount = limitAmount.subtract(spentAmount);
 
         BigDecimal spentPercentage = BigDecimal.ZERO;
@@ -134,7 +153,7 @@ public class BudgetServiceImpl implements BudgetService {
                 .spentAmount(spentAmount)
                 .remainingAmount(remainingAmount)
                 .spentPercentage(spentPercentage)
-                .currency(budget.getCurrency())
+                .currency(budget.getAmount() != null ? budget.getAmount().currency() : "USD")
                 .periodMonth(month)
                 .periodYear(year)
                 .status(status)
@@ -144,34 +163,42 @@ public class BudgetServiceImpl implements BudgetService {
     @Override
     @Transactional
     public BudgetResponse updateBudget(UUID id, UpdateBudgetRequest request) {
-        Budget budget = findEntityById(id);
+        Budget budget = budgetRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
 
-        if (request.getName() != null && !request.getName().isBlank()) {
-            budget.setName(request.getName());
-        }
-        if (request.getAmount() != null) {
-            budget.setAmount(request.getAmount());
-        }
-        if (request.getPeriodMonth() != null) {
-            budget.setPeriodMonth(request.getPeriodMonth());
-        }
-        if (request.getPeriodYear() != null) {
-            budget.setPeriodYear(request.getPeriodYear());
-        }
+        budget.updateDetails(
+                request.getName(),
+                null,
+                request.getAmount(),
+                null,
+                request.getPeriodMonth(),
+                request.getPeriodYear()
+        );
 
-        Budget updatedBudget = budgetRepository.save(budget);
-        return BudgetResponse.fromEntity(updatedBudget);
+        Budget updated = budgetRepository.save(budget);
+        return mapToResponse(updated);
     }
 
     @Override
     @Transactional
     public void deleteBudget(UUID id) {
-        Budget budget = findEntityById(id);
-        budgetRepository.delete(budget);
+        budgetRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+        budgetRepository.delete(id);
     }
 
-    private Budget findEntityById(UUID id) {
-        return budgetRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+    private BudgetResponse mapToResponse(Budget b) {
+        return BudgetResponse.builder()
+                .id(b.getId())
+                .workspaceId(b.getWorkspaceId())
+                .categoryId(b.getCategoryId())
+                .name(b.getName())
+                .amount(b.getAmount() != null ? b.getAmount().amount() : null)
+                .currency(b.getAmount() != null ? b.getAmount().currency() : "USD")
+                .periodMonth(b.getPeriodMonth())
+                .periodYear(b.getPeriodYear())
+                .createdAt(b.getCreatedAt())
+                .updatedAt(b.getUpdatedAt())
+                .build();
     }
 }
