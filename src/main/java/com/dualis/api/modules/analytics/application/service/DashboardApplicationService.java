@@ -1,10 +1,11 @@
-package com.dualis.api.service.impl;
+package com.dualis.api.modules.analytics.application.service;
 
 import com.dualis.api.domain.model.*;
 import com.dualis.api.domain.repository.*;
 import com.dualis.api.domain.specification.TransactionSpecification;
 import com.dualis.api.dto.response.CategoryExpenseBreakdownResponse;
 import com.dualis.api.dto.response.DashboardSummaryResponse;
+import com.dualis.api.modules.analytics.application.usecase.GetDashboardSummaryUseCase;
 import com.dualis.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,9 +20,9 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
-// Deprecated in favor of com.dualis.api.modules.analytics.application.service.DashboardApplicationService
+@Service
 @RequiredArgsConstructor
-public class DashboardServiceImpl implements DashboardService {
+public class DashboardApplicationService implements GetDashboardSummaryUseCase, DashboardService {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
@@ -47,7 +48,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() ? activeAccounts.get(0).getCurrency() : "PEN");
+        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() ? activeAccounts.get(0).getCurrency() : "USD");
 
         // 2. Income & Expense Cash Flow
         Specification<Transaction> incomeSpec = TransactionSpecification.filterTransactions(

@@ -23,7 +23,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(DashboardController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = DashboardController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class DashboardControllerTest {
 
@@ -32,6 +34,9 @@ class DashboardControllerTest {
 
     @MockitoBean
     private DashboardService dashboardService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private DashboardSummaryResponse summaryResponse;

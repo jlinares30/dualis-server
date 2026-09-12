@@ -35,6 +35,9 @@ class DashboardServiceImplTest {
     @Mock
     private BudgetRepository budgetRepository;
 
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
     @InjectMocks
     private DashboardServiceImpl dashboardService;
 
