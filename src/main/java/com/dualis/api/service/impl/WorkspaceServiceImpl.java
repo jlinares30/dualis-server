@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.workspace.application.service.WorkspaceApplicationService
 @RequiredArgsConstructor
 public class WorkspaceServiceImpl implements WorkspaceService {
 

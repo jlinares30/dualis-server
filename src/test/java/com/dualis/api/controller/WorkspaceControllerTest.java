@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(WorkspaceController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = WorkspaceController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class WorkspaceControllerTest {
 
@@ -40,6 +42,9 @@ class WorkspaceControllerTest {
 
     @MockitoBean
     private WorkspaceService workspaceService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private WorkspaceResponse workspaceResponse;
