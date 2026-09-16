@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.savingsgoal.application.service.SavingsGoalApplicationService
 @RequiredArgsConstructor
 public class SavingsGoalServiceImpl implements SavingsGoalService {
 
