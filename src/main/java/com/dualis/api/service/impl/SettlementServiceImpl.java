@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.settlement.application.service.SettlementApplicationService
 @RequiredArgsConstructor
 public class SettlementServiceImpl implements SettlementService {
 

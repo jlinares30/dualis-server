@@ -1,4 +1,4 @@
-package com.dualis.api.service.impl;
+package com.dualis.api.modules.sync.application.service;
 
 import com.dualis.api.domain.model.*;
 import com.dualis.api.domain.repository.*;
@@ -7,6 +7,7 @@ import com.dualis.api.dto.request.CreateTransactionRequest;
 import com.dualis.api.dto.request.SyncPullRequest;
 import com.dualis.api.dto.request.SyncPushRequest;
 import com.dualis.api.dto.response.*;
+import com.dualis.api.modules.sync.application.usecase.ManageSyncUseCase;
 import com.dualis.api.service.SyncService;
 import com.dualis.api.service.TransactionService;
 import lombok.RequiredArgsConstructor;
@@ -16,13 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-// Deprecated in favor of com.dualis.api.modules.sync.application.service.SyncApplicationService
+@Service
 @RequiredArgsConstructor
-public class SyncServiceImpl implements SyncService {
+public class SyncApplicationService implements ManageSyncUseCase, SyncService {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;

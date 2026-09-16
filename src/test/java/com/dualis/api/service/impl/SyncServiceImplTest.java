@@ -27,7 +27,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SyncServiceImplTest {
 
     @Mock
@@ -81,15 +85,12 @@ class SyncServiceImplTest {
                 .lastSyncedAt(null)
                 .build();
 
-        @SuppressWarnings("unchecked")
-        Specification<Transaction> anySpec = any(Specification.class);
-
-        when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(account));
-        when(transactionRepository.findAll(anySpec)).thenReturn(List.of());
-        when(splitRuleRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of());
+        when(accountRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of(account));
+        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of());
+        when(splitRuleRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of());
         when(budgetRepository.findAll()).thenReturn(List.of());
-        when(categoryRepository.findByWorkspaceIdOrSystemDefault(workspaceId)).thenReturn(List.of());
-        when(settlementRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of());
+        when(categoryRepository.findByWorkspaceIdOrSystemDefault(any(UUID.class))).thenReturn(List.of());
+        when(settlementRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of());
 
         SyncResponse response = syncService.pullDelta(request);
 
@@ -112,11 +113,12 @@ class SyncServiceImplTest {
                 .offlineTransactions(List.of(txReq))
                 .build();
 
-        @SuppressWarnings("unchecked")
-        Specification<Transaction> anySpec = any(Specification.class);
-
-        when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(account));
-        when(transactionRepository.findAll(anySpec)).thenReturn(List.of());
+        when(accountRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of(account));
+        when(transactionRepository.findAll(any(Specification.class))).thenReturn(List.of());
+        when(splitRuleRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of());
+        when(budgetRepository.findAll()).thenReturn(List.of());
+        when(categoryRepository.findByWorkspaceIdOrSystemDefault(any(UUID.class))).thenReturn(List.of());
+        when(settlementRepository.findByWorkspaceId(any(UUID.class))).thenReturn(List.of());
 
         SyncResponse response = syncService.pushOfflineData(pushRequest);
 

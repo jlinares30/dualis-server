@@ -27,7 +27,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(SettlementController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = SettlementController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class SettlementControllerTest {
 
@@ -39,6 +41,9 @@ class SettlementControllerTest {
 
     @MockitoBean
     private SettlementService settlementService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private UUID settlementId;

@@ -87,7 +87,9 @@ class SyncControllerTest {
         CreateTransactionRequest txReq = CreateTransactionRequest.builder()
                 .workspaceId(workspaceId)
                 .accountId(UUID.randomUUID())
+                .type(com.dualis.api.domain.model.TransactionType.EXPENSE)
                 .amount(new BigDecimal("50.00"))
+                .currency("USD")
                 .build();
 
         SyncPushRequest request = SyncPushRequest.builder()

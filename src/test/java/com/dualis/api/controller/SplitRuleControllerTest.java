@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(SplitRuleController.class)
+import com.dualis.api.security.JwtTokenProvider;
+
+@WebMvcTest(controllers = SplitRuleController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class SplitRuleControllerTest {
 
@@ -40,6 +42,9 @@ class SplitRuleControllerTest {
 
     @MockitoBean
     private SplitRuleService splitRuleService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private UUID workspaceId;
     private UUID ruleId;

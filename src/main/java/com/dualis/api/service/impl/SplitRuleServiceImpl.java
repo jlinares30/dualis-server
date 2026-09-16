@@ -19,7 +19,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.settlement.application.service.SplitRuleApplicationService
 @RequiredArgsConstructor
 public class SplitRuleServiceImpl implements SplitRuleService {
 

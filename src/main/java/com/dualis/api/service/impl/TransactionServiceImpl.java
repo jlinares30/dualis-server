@@ -21,7 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-@Service
+// Deprecated in favor of com.dualis.api.modules.transaction.application.service.TransactionApplicationService
 @RequiredArgsConstructor
 public class TransactionServiceImpl implements TransactionService {
 
