@@ -1,8 +1,8 @@
 package com.dualis.api.modules.savingsgoal.application.service;
 
-import com.dualis.api.dto.request.CreateGoalRequest;
-import com.dualis.api.dto.request.DepositGoalRequest;
-import com.dualis.api.dto.response.SavingsGoalResponse;
+import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
 import com.dualis.api.modules.savingsgoal.domain.model.SavingsGoal;
 import com.dualis.api.modules.savingsgoal.domain.repository.SavingsGoalRepositoryPort;
 import com.dualis.api.shared.domain.valueobject.Money;

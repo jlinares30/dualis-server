@@ -1,13 +1,12 @@
 package com.dualis.api.modules.savingsgoal.application.service;
 
-import com.dualis.api.dto.request.CreateGoalRequest;
-import com.dualis.api.dto.request.DepositGoalRequest;
-import com.dualis.api.dto.response.SavingsGoalResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.savingsgoal.application.usecase.ManageSavingsGoalUseCase;
 import com.dualis.api.modules.savingsgoal.domain.model.SavingsGoal;
 import com.dualis.api.modules.savingsgoal.domain.repository.SavingsGoalRepositoryPort;
-import com.dualis.api.service.SavingsGoalService;
+import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase, SavingsGoalService {
+public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
 
     private final SavingsGoalRepositoryPort savingsGoalRepository;
 
@@ -42,14 +41,14 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase, 
                 .build();
 
         SavingsGoal saved = savingsGoalRepository.save(goal);
-        return mapToResponse(saved);
+        return SavingsGoalResponse.fromDomain(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SavingsGoalResponse> getGoalsByWorkspace(UUID workspaceId) {
         return savingsGoalRepository.findByWorkspaceId(workspaceId).stream()
-                .map(this::mapToResponse)
+                .map(SavingsGoalResponse::fromDomain)
                 .toList();
     }
 
@@ -62,7 +61,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase, 
         goal.deposit(request.getAmount());
 
         SavingsGoal updated = savingsGoalRepository.save(goal);
-        return mapToResponse(updated);
+        return SavingsGoalResponse.fromDomain(updated);
     }
 
     @Override
@@ -72,20 +71,5 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase, 
             throw new ResourceNotFoundException("Goal not found with id: " + goalId);
         }
         savingsGoalRepository.delete(goalId);
-    }
-
-    private SavingsGoalResponse mapToResponse(SavingsGoal goal) {
-        return SavingsGoalResponse.builder()
-                .id(goal.getId())
-                .workspaceId(goal.getWorkspaceId())
-                .name(goal.getName())
-                .targetAmount(goal.getTargetAmount() != null ? goal.getTargetAmount().amount() : null)
-                .currentAmount(goal.getCurrentAmount() != null ? goal.getCurrentAmount().amount() : BigDecimal.ZERO)
-                .deadlineDate(goal.getDeadlineDate())
-                .category(goal.getCategory())
-                .currency(goal.getTargetAmount() != null ? goal.getTargetAmount().currency() : "PEN")
-                .createdAt(goal.getCreatedAt())
-                .updatedAt(goal.getUpdatedAt())
-                .build();
     }
 }
