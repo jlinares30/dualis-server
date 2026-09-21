@@ -1,7 +1,7 @@
 package com.dualis.api.modules.subscription.application.usecase;
 
-import com.dualis.api.dto.request.CreateSubscriptionRequest;
-import com.dualis.api.dto.response.SubscriptionResponse;
+import com.dualis.api.modules.subscription.dto.request.CreateSubscriptionRequest;
+import com.dualis.api.modules.subscription.dto.response.SubscriptionResponse;
 
 import java.util.List;
 import java.util.UUID;

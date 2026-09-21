@@ -1,7 +1,7 @@
 package com.dualis.api.modules.subscription.application.service;
 
-import com.dualis.api.dto.request.CreateSubscriptionRequest;
-import com.dualis.api.dto.response.SubscriptionResponse;
+import com.dualis.api.modules.subscription.dto.request.CreateSubscriptionRequest;
+import com.dualis.api.modules.subscription.dto.response.SubscriptionResponse;
 import com.dualis.api.modules.subscription.domain.model.Subscription;
 import com.dualis.api.modules.subscription.domain.repository.SubscriptionRepositoryPort;
 import com.dualis.api.shared.domain.valueobject.Money;
