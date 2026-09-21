@@ -1,6 +1,6 @@
 package com.dualis.api.modules.analytics.application.usecase;
 
-import com.dualis.api.dto.response.DashboardSummaryResponse;
+import com.dualis.api.modules.analytics.dto.response.DashboardSummaryResponse;
 
 import java.util.UUID;
 

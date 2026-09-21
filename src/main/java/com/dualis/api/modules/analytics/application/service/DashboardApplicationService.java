@@ -1,14 +1,22 @@
 package com.dualis.api.modules.analytics.application.service;
 
-import com.dualis.api.domain.model.*;
-import com.dualis.api.domain.repository.*;
-import com.dualis.api.domain.specification.TransactionSpecification;
-import com.dualis.api.dto.response.CategoryExpenseBreakdownResponse;
-import com.dualis.api.dto.response.DashboardSummaryResponse;
+import com.dualis.api.modules.account.domain.model.Account;
+import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
 import com.dualis.api.modules.analytics.application.usecase.GetDashboardSummaryUseCase;
-import com.dualis.api.service.DashboardService;
+import com.dualis.api.modules.analytics.dto.response.CategoryExpenseBreakdownResponse;
+import com.dualis.api.modules.analytics.dto.response.DashboardSummaryResponse;
+import com.dualis.api.modules.budget.domain.model.Budget;
+import com.dualis.api.modules.budget.domain.repository.BudgetRepositoryPort;
+import com.dualis.api.modules.category.domain.model.Category;
+import com.dualis.api.modules.category.domain.model.CategoryNature;
+import com.dualis.api.modules.category.domain.repository.CategoryRepositoryPort;
+import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +30,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class DashboardApplicationService implements GetDashboardSummaryUseCase, DashboardService {
+public class DashboardApplicationService implements GetDashboardSummaryUseCase {
 
-    private final AccountRepository accountRepository;
-    private final TransactionRepository transactionRepository;
-    private final CategoryRepository categoryRepository;
-    private final BudgetRepository budgetRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final AccountRepositoryPort accountRepository;
+    private final TransactionRepositoryPort transactionRepository;
+    private final CategoryRepositoryPort categoryRepository;
+    private final BudgetRepositoryPort budgetRepository;
+    private final WorkspaceRepositoryPort workspaceRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -44,27 +52,25 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase, 
         // 1. Total Liquidity / Balance across active accounts
         List<Account> activeAccounts = accountRepository.findByWorkspaceIdAndStatus(workspaceId, AccountStatus.ACTIVE);
         BigDecimal totalBalance = activeAccounts.stream()
-                .map(Account::getBalance)
+                .map(a -> a.getBalance() != null ? a.getBalance().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() ? activeAccounts.get(0).getCurrency() : "USD");
+        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() && activeAccounts.get(0).getBalance() != null ? activeAccounts.get(0).getBalance().currency() : "USD");
 
         // 2. Income & Expense Cash Flow
-        Specification<Transaction> incomeSpec = TransactionSpecification.filterTransactions(
+        List<Transaction> incomeTransactions = transactionRepository.findTransactions(
                 workspaceId, null, TransactionType.INCOME, null, startDate, endDate, null
         );
-        List<Transaction> incomeTransactions = transactionRepository.findAll(incomeSpec);
         BigDecimal monthlyIncome = incomeTransactions.stream()
-                .map(Transaction::getAmount)
+                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Specification<Transaction> expenseSpec = TransactionSpecification.filterTransactions(
+        List<Transaction> expenseTransactions = transactionRepository.findTransactions(
                 workspaceId, null, TransactionType.EXPENSE, null, startDate, endDate, null
         );
-        List<Transaction> expenseTransactions = transactionRepository.findAll(expenseSpec);
         BigDecimal monthlyExpenses = expenseTransactions.stream()
-                .map(Transaction::getAmount)
+                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 3. Net Savings & Savings Rate
@@ -78,12 +84,12 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase, 
         // 4. Essential vs Non-Essential Breakdown
         BigDecimal essentialExpenses = expenseTransactions.stream()
                 .filter(t -> t.getCategoryNature() == CategoryNature.ESSENTIAL)
-                .map(Transaction::getAmount)
+                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal nonEssentialExpenses = expenseTransactions.stream()
                 .filter(t -> t.getCategoryNature() == CategoryNature.NON_ESSENTIAL)
-                .map(Transaction::getAmount)
+                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal essentialPercentage = BigDecimal.ZERO;
@@ -103,7 +109,8 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase, 
         for (Transaction expense : expenseTransactions) {
             UUID catId = expense.getCategoryId();
             if (catId != null) {
-                categoryExpensesMap.merge(catId, expense.getAmount(), BigDecimal::add);
+                BigDecimal amt = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
+                categoryExpensesMap.merge(catId, amt, BigDecimal::add);
             }
         }
 
@@ -140,10 +147,10 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase, 
         int exceededBudgetsCount = 0;
 
         for (Budget b : periodBudgets) {
-            BigDecimal budgetLimit = b.getAmount();
+            BigDecimal budgetLimit = b.getAmount() != null ? b.getAmount().amount() : BigDecimal.ZERO;
             BigDecimal catSpent = expenseTransactions.stream()
                     .filter(t -> b.getCategoryId() == null || Objects.equals(t.getCategoryId(), b.getCategoryId()))
-                    .map(Transaction::getAmount)
+                    .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             if (catSpent.compareTo(budgetLimit) > 0) {
