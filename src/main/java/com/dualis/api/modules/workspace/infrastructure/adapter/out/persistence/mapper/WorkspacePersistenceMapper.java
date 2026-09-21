@@ -63,7 +63,7 @@ public class WorkspacePersistenceMapper {
         if (domain.getMembers() != null) {
             List<WorkspaceMemberJpaEntity> memberEntities = domain.getMembers().stream()
                     .map(m -> WorkspaceMemberJpaEntity.builder()
-                            .id(m.getId())
+                            .id(domain.getId() == null ? null : m.getId())
                             .workspace(entity)
                             .userEmail(m.getUserEmail())
                             .role(m.getRole())

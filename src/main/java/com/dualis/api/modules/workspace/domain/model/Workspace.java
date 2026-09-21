@@ -46,7 +46,7 @@ public class Workspace {
                 .anyMatch(m -> m.getUserEmail().equalsIgnoreCase(email));
         if (!alreadyMember) {
             members.add(WorkspaceMember.builder()
-                    .id(UUID.randomUUID())
+                    .id(null)
                     .workspaceId(this.id)
                     .userEmail(email)
                     .role(role)
