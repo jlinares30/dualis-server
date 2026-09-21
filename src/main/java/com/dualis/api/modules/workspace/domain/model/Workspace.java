@@ -61,6 +61,11 @@ public class Workspace {
         this.updatedAt = OffsetDateTime.now();
     }
 
+    public void assignInvitationCode(String invitationCode) {
+        this.invitationCode = invitationCode;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     public void activate() {
         this.isActive = true;
         this.updatedAt = OffsetDateTime.now();

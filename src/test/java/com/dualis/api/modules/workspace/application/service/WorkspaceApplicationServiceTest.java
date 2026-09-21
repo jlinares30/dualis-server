@@ -1,10 +1,10 @@
 package com.dualis.api.modules.workspace.application.service;
 
-import com.dualis.api.domain.model.WorkspaceRole;
-import com.dualis.api.domain.model.WorkspaceType;
-import com.dualis.api.dto.request.CreateWorkspaceRequest;
-import com.dualis.api.dto.request.JoinWorkspaceRequest;
-import com.dualis.api.dto.response.WorkspaceResponse;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.request.JoinWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.response.WorkspaceResponse;
 import com.dualis.api.modules.workspace.domain.model.Workspace;
 import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
 import org.junit.jupiter.api.BeforeEach;

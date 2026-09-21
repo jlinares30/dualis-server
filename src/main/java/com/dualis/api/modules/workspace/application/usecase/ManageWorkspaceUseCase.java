@@ -1,10 +1,10 @@
 package com.dualis.api.modules.workspace.application.usecase;
 
-import com.dualis.api.dto.request.CreateWorkspaceRequest;
-import com.dualis.api.dto.request.InvitePartnerRequest;
-import com.dualis.api.dto.request.JoinWorkspaceRequest;
-import com.dualis.api.dto.request.UpdateWorkspaceRequest;
-import com.dualis.api.dto.response.WorkspaceResponse;
+import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.request.InvitePartnerRequest;
+import com.dualis.api.modules.workspace.dto.request.JoinWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.request.UpdateWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.response.WorkspaceResponse;
 
 import java.util.List;
 import java.util.UUID;
