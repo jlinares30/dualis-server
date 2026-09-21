@@ -1,9 +1,9 @@
 package com.dualis.api.modules.budget.application.usecase;
 
-import com.dualis.api.dto.request.CreateBudgetRequest;
-import com.dualis.api.dto.request.UpdateBudgetRequest;
-import com.dualis.api.dto.response.BudgetProgressResponse;
-import com.dualis.api.dto.response.BudgetResponse;
+import com.dualis.api.modules.budget.dto.request.CreateBudgetRequest;
+import com.dualis.api.modules.budget.dto.request.UpdateBudgetRequest;
+import com.dualis.api.modules.budget.dto.response.BudgetProgressResponse;
+import com.dualis.api.modules.budget.dto.response.BudgetResponse;
 
 import java.util.List;
 import java.util.UUID;

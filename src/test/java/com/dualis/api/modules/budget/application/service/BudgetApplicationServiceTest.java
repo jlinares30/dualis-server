@@ -1,10 +1,10 @@
 package com.dualis.api.modules.budget.application.service;
 
-import com.dualis.api.domain.repository.TransactionRepository;
-import com.dualis.api.dto.request.CreateBudgetRequest;
-import com.dualis.api.dto.response.BudgetResponse;
 import com.dualis.api.modules.budget.domain.model.Budget;
 import com.dualis.api.modules.budget.domain.repository.BudgetRepositoryPort;
+import com.dualis.api.modules.budget.dto.request.CreateBudgetRequest;
+import com.dualis.api.modules.budget.dto.response.BudgetResponse;
+import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
 import com.dualis.api.shared.domain.valueobject.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,7 @@ class BudgetApplicationServiceTest {
     private BudgetRepositoryPort budgetRepository;
 
     @Mock
-    private TransactionRepository transactionRepository;
+    private TransactionRepositoryPort transactionRepository;
 
     @InjectMocks
     private BudgetApplicationService budgetApplicationService;
