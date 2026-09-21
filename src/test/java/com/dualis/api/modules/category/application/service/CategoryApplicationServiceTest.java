@@ -1,7 +1,7 @@
 package com.dualis.api.modules.category.application.service;
 
-import com.dualis.api.dto.request.CreateCategoryRequest;
-import com.dualis.api.dto.response.CategoryResponse;
+import com.dualis.api.modules.category.dto.request.CreateCategoryRequest;
+import com.dualis.api.modules.category.dto.response.CategoryResponse;
 import com.dualis.api.modules.category.domain.model.Category;
 import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.category.domain.model.CategoryType;
@@ -61,8 +61,8 @@ class CategoryApplicationServiceTest {
                 .name("Food & Dining")
                 .icon("restaurant")
                 .color("#FF5722")
-                .type(com.dualis.api.domain.model.CategoryType.EXPENSE)
-                .categoryNature(com.dualis.api.domain.model.CategoryNature.ESSENTIAL)
+                .type(CategoryType.EXPENSE)
+                .categoryNature(CategoryNature.ESSENTIAL)
                 .build();
 
         when(categoryRepository.save(any(Category.class))).thenReturn(category);

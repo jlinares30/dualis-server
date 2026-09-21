@@ -1,15 +1,14 @@
 package com.dualis.api.modules.category.application.service;
 
-import com.dualis.api.dto.request.CreateCategoryRequest;
-import com.dualis.api.dto.request.UpdateCategoryRequest;
-import com.dualis.api.dto.response.CategoryResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.category.application.usecase.ManageCategoryUseCase;
 import com.dualis.api.modules.category.domain.model.Category;
 import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.category.domain.model.CategoryType;
 import com.dualis.api.modules.category.domain.repository.CategoryRepositoryPort;
-import com.dualis.api.service.CategoryService;
+import com.dualis.api.modules.category.dto.request.CreateCategoryRequest;
+import com.dualis.api.modules.category.dto.request.UpdateCategoryRequest;
+import com.dualis.api.modules.category.dto.response.CategoryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class CategoryApplicationService implements ManageCategoryUseCase, CategoryService {
+public class CategoryApplicationService implements ManageCategoryUseCase {
 
     private final CategoryRepositoryPort categoryRepository;
 
@@ -28,12 +27,10 @@ public class CategoryApplicationService implements ManageCategoryUseCase, Catego
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         CategoryType domainType = request.getType() != null
-                ? CategoryType.valueOf(request.getType().name())
+                ? request.getType()
                 : CategoryType.EXPENSE;
 
-        CategoryNature domainNature = request.getCategoryNature() != null
-                ? CategoryNature.valueOf(request.getCategoryNature().name())
-                : null;
+        CategoryNature domainNature = request.getCategoryNature();
 
         Category category = Category.builder()
                 .workspaceId(request.getWorkspaceId())
@@ -48,22 +45,19 @@ public class CategoryApplicationService implements ManageCategoryUseCase, Catego
                 .build();
 
         Category saved = categoryRepository.save(category);
-        return mapToResponse(saved);
+        return CategoryResponse.fromDomain(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getCategoriesByWorkspace(UUID workspaceId, com.dualis.api.domain.model.CategoryType type) {
+    public List<CategoryResponse> getCategoriesByWorkspace(UUID workspaceId, CategoryType type) {
         List<Category> list = categoryRepository.findByWorkspaceIdOrSystemDefault(workspaceId);
         if (type != null) {
-            CategoryType domainType = CategoryType.valueOf(type.name());
             list = list.stream()
-                    .filter(c -> c.getType() == domainType)
+                    .filter(c -> c.getType() == type)
                     .toList();
         }
-        return list.stream()
-                .map(this::mapToResponse)
-                .toList();
+        return list.stream().map(CategoryResponse::fromDomain).toList();
     }
 
     @Override
@@ -71,7 +65,7 @@ public class CategoryApplicationService implements ManageCategoryUseCase, Catego
     public CategoryResponse getCategoryById(UUID id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
-        return mapToResponse(category);
+        return CategoryResponse.fromDomain(category);
     }
 
     @Override
@@ -80,46 +74,27 @@ public class CategoryApplicationService implements ManageCategoryUseCase, Catego
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
 
-        CategoryType domainType = request.getType() != null
-                ? CategoryType.valueOf(request.getType().name())
-                : null;
-
-        CategoryNature domainNature = request.getCategoryNature() != null
-                ? CategoryNature.valueOf(request.getCategoryNature().name())
-                : null;
+        if (category.isSystemDefault()) {
+            throw new IllegalArgumentException("System default categories cannot be modified");
+        }
 
         category.updateDetails(
                 request.getName(),
                 request.getIcon(),
                 request.getColor(),
-                domainType,
-                domainNature
+                request.getType(),
+                request.getCategoryNature()
         );
 
         Category updated = categoryRepository.save(category);
-        return mapToResponse(updated);
+        return CategoryResponse.fromDomain(updated);
     }
 
     @Override
     @Transactional
     public void deleteCategory(UUID id) {
-        categoryRepository.findById(id)
+        Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
         categoryRepository.delete(id);
-    }
-
-    private CategoryResponse mapToResponse(Category c) {
-        return CategoryResponse.builder()
-                .id(c.getId())
-                .workspaceId(c.getWorkspaceId())
-                .name(c.getName())
-                .icon(c.getIcon())
-                .color(c.getColor())
-                .type(c.getType() != null ? com.dualis.api.domain.model.CategoryType.valueOf(c.getType().name()) : null)
-                .categoryNature(c.getCategoryNature() != null ? com.dualis.api.domain.model.CategoryNature.valueOf(c.getCategoryNature().name()) : null)
-                .isSystemDefault(c.isSystemDefault())
-                .createdAt(c.getCreatedAt())
-                .updatedAt(c.getUpdatedAt())
-                .build();
     }
 }
