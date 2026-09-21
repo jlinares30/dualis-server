@@ -1,8 +1,8 @@
 package com.dualis.api.modules.settlement.application.usecase;
 
-import com.dualis.api.dto.request.CreateSettlementRequest;
-import com.dualis.api.dto.response.DebtBalanceSummaryResponse;
-import com.dualis.api.dto.response.SettlementResponse;
+import com.dualis.api.modules.settlement.dto.request.CreateSettlementRequest;
+import com.dualis.api.modules.settlement.dto.response.DebtBalanceSummaryResponse;
+import com.dualis.api.modules.settlement.dto.response.SettlementResponse;
 
 import java.util.List;
 import java.util.UUID;

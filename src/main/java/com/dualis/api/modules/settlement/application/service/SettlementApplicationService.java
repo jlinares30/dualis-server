@@ -1,16 +1,5 @@
 package com.dualis.api.modules.settlement.application.service;
 
-import com.dualis.api.domain.model.Transaction;
-import com.dualis.api.domain.model.TransactionType;
-import com.dualis.api.domain.model.Workspace;
-import com.dualis.api.domain.model.WorkspaceMember;
-import com.dualis.api.domain.model.WorkspaceRole;
-import com.dualis.api.domain.repository.TransactionRepository;
-import com.dualis.api.domain.repository.WorkspaceRepository;
-import com.dualis.api.domain.specification.TransactionSpecification;
-import com.dualis.api.dto.request.CreateSettlementRequest;
-import com.dualis.api.dto.response.DebtBalanceSummaryResponse;
-import com.dualis.api.dto.response.SettlementResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.settlement.application.usecase.ManageSettlementUseCase;
 import com.dualis.api.modules.settlement.domain.model.Settlement;
@@ -18,10 +7,18 @@ import com.dualis.api.modules.settlement.domain.model.SettlementStatus;
 import com.dualis.api.modules.settlement.domain.model.SplitRule;
 import com.dualis.api.modules.settlement.domain.repository.SettlementRepositoryPort;
 import com.dualis.api.modules.settlement.domain.repository.SplitRuleRepositoryPort;
-import com.dualis.api.service.SettlementService;
+import com.dualis.api.modules.settlement.dto.request.CreateSettlementRequest;
+import com.dualis.api.modules.settlement.dto.response.DebtBalanceSummaryResponse;
+import com.dualis.api.modules.settlement.dto.response.SettlementResponse;
+import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceMember;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
+import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,12 +31,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class SettlementApplicationService implements ManageSettlementUseCase, SettlementService {
+public class SettlementApplicationService implements ManageSettlementUseCase {
 
     private final SettlementRepositoryPort settlementRepository;
     private final SplitRuleRepositoryPort splitRuleRepository;
-    private final TransactionRepository transactionRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final TransactionRepositoryPort transactionRepository;
+    private final WorkspaceRepositoryPort workspaceRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -54,13 +51,12 @@ public class SettlementApplicationService implements ManageSettlementUseCase, Se
                 .findFirst()
                 .orElse("partner@example.com");
 
-        Specification<Transaction> spec = TransactionSpecification.filterTransactions(
+        List<Transaction> expenses = transactionRepository.findTransactions(
                 workspaceId, null, TransactionType.EXPENSE, null, null, null, null
         );
-        List<Transaction> expenses = transactionRepository.findAll(spec);
 
         BigDecimal totalExpensesVal = expenses.stream()
-                .map(Transaction::getAmount)
+                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         Money totalExpenses = Money.of(totalExpensesVal);
 
@@ -100,31 +96,44 @@ public class SettlementApplicationService implements ManageSettlementUseCase, Se
                 netBalance = netBalance.abs();
                 debtor = partnerAEmail;
                 creditor = partnerBEmail;
+                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
+            } else if (netBalance.amount().compareTo(BigDecimal.ZERO) == 0) {
+                debtor = null;
+                creditor = null;
+                summaryText = "All settled up! No outstanding balances.";
             } else {
                 debtor = partnerBEmail;
                 creditor = partnerAEmail;
+                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
             }
         } else {
-            netBalance = partnerANet.abs().subtract(totalSettled);
-            debtor = partnerAEmail;
-            creditor = partnerBEmail;
-        }
-
-        if (netBalance.isZero()) {
-            summaryText = "All debts settled up between partners";
-        } else {
-            summaryText = debtor + " owes " + creditor + " $" + netBalance.amount().setScale(2, RoundingMode.HALF_UP);
+            Money absNet = partnerANet.abs();
+            netBalance = absNet.subtract(totalSettled);
+            if (netBalance.amount().compareTo(BigDecimal.ZERO) < 0) {
+                netBalance = netBalance.abs();
+                debtor = partnerBEmail;
+                creditor = partnerAEmail;
+                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
+            } else if (netBalance.amount().compareTo(BigDecimal.ZERO) == 0) {
+                debtor = null;
+                creditor = null;
+                summaryText = "All settled up! No outstanding balances.";
+            } else {
+                debtor = partnerAEmail;
+                creditor = partnerBEmail;
+                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
+            }
         }
 
         return DebtBalanceSummaryResponse.builder()
                 .workspaceId(workspaceId)
                 .totalSharedExpenses(totalExpenses.amount())
                 .partnerAEmail(partnerAEmail)
-                .partnerAPaidTotal(partnerAPaid.amount())
                 .partnerAShareTotal(partnerAShare.amount())
+                .partnerAPaidTotal(partnerAPaid.amount())
                 .partnerBEmail(partnerBEmail)
-                .partnerBPaidTotal(partnerBPaid.amount())
                 .partnerBShareTotal(partnerBShare.amount())
+                .partnerBPaidTotal(partnerBPaid.amount())
                 .totalSettledAmount(totalSettled.amount())
                 .netBalance(netBalance.amount())
                 .debtorEmail(debtor)
@@ -136,27 +145,29 @@ public class SettlementApplicationService implements ManageSettlementUseCase, Se
     @Override
     @Transactional
     public SettlementResponse createSettlement(CreateSettlementRequest request) {
+        Money amount = Money.of(request.getAmount(), request.getCurrency());
+
         Settlement settlement = Settlement.builder()
                 .workspaceId(request.getWorkspaceId())
                 .payerEmail(request.getPayerEmail())
                 .recipientEmail(request.getRecipientEmail())
-                .amount(Money.of(request.getAmount(), request.getCurrency() != null ? request.getCurrency() : Money.DEFAULT_CURRENCY))
-                .status(SettlementStatus.COMPLETED)
+                .amount(amount)
+                .status(SettlementStatus.PENDING)
                 .note(request.getNote())
-                .settledAt(OffsetDateTime.now())
+                .settledAt(null)
                 .createdAt(OffsetDateTime.now())
                 .updatedAt(OffsetDateTime.now())
                 .build();
 
         Settlement saved = settlementRepository.save(settlement);
-        return mapToResponse(saved);
+        return SettlementResponse.fromEntity(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SettlementResponse> getSettlementsByWorkspace(UUID workspaceId) {
         return settlementRepository.findByWorkspaceId(workspaceId).stream()
-                .map(this::mapToResponse)
+                .map(SettlementResponse::fromEntity)
                 .toList();
     }
 
@@ -165,9 +176,10 @@ public class SettlementApplicationService implements ManageSettlementUseCase, Se
     public SettlementResponse completeSettlement(UUID id) {
         Settlement settlement = settlementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Settlement not found with id: " + id));
+
         settlement.complete();
-        Settlement updated = settlementRepository.save(settlement);
-        return mapToResponse(updated);
+        Settlement saved = settlementRepository.save(settlement);
+        return SettlementResponse.fromEntity(saved);
     }
 
     @Override
@@ -175,23 +187,8 @@ public class SettlementApplicationService implements ManageSettlementUseCase, Se
     public void cancelSettlement(UUID id) {
         Settlement settlement = settlementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Settlement not found with id: " + id));
+
         settlement.cancel();
         settlementRepository.save(settlement);
-    }
-
-    private SettlementResponse mapToResponse(Settlement s) {
-        return SettlementResponse.builder()
-                .id(s.getId())
-                .workspaceId(s.getWorkspaceId())
-                .payerEmail(s.getPayerEmail())
-                .recipientEmail(s.getRecipientEmail())
-                .amount(s.getAmount().amount())
-                .currency(s.getAmount().currency())
-                .status(com.dualis.api.domain.model.SettlementStatus.valueOf(s.getStatus().name()))
-                .note(s.getNote())
-                .settledAt(s.getSettledAt())
-                .createdAt(s.getCreatedAt())
-                .updatedAt(s.getUpdatedAt())
-                .build();
     }
 }

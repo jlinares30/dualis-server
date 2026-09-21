@@ -1,30 +1,28 @@
 package com.dualis.api.modules.settlement.application.service;
 
-import com.dualis.api.dto.request.CalculateSplitRequest;
-import com.dualis.api.dto.request.CreateSplitRuleRequest;
-import com.dualis.api.dto.request.UpdateSplitRuleRequest;
-import com.dualis.api.dto.response.SplitCalculationResult;
-import com.dualis.api.dto.response.SplitRuleResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.settlement.application.usecase.ManageSplitRuleUseCase;
 import com.dualis.api.modules.settlement.domain.model.SplitBreakdown;
 import com.dualis.api.modules.settlement.domain.model.SplitRule;
 import com.dualis.api.modules.settlement.domain.model.SplitType;
 import com.dualis.api.modules.settlement.domain.repository.SplitRuleRepositoryPort;
-import com.dualis.api.service.SplitRuleService;
+import com.dualis.api.modules.settlement.dto.request.CalculateSplitRequest;
+import com.dualis.api.modules.settlement.dto.request.CreateSplitRuleRequest;
+import com.dualis.api.modules.settlement.dto.request.UpdateSplitRuleRequest;
+import com.dualis.api.modules.settlement.dto.response.SplitCalculationResult;
+import com.dualis.api.modules.settlement.dto.response.SplitRuleResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class SplitRuleApplicationService implements ManageSplitRuleUseCase, SplitRuleService {
+public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
 
     private final SplitRuleRepositoryPort splitRuleRepository;
 
@@ -36,7 +34,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase, Spli
         }
 
         SplitType domainSplitType = request.getSplitType() != null
-                ? SplitType.valueOf(request.getSplitType().name())
+                ? request.getSplitType()
                 : SplitType.EQUAL;
 
         SplitRule rule = SplitRule.builder()
@@ -86,13 +84,9 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase, Spli
             unsetPreviousDefault(rule.getWorkspaceId());
         }
 
-        SplitType domainSplitType = request.getSplitType() != null
-                ? SplitType.valueOf(request.getSplitType().name())
-                : null;
-
         rule.update(
                 request.getName(),
-                domainSplitType,
+                request.getSplitType(),
                 request.getPartnerAPercentage(),
                 request.getPartnerBPercentage(),
                 request.getPartnerAIncome(),
@@ -133,7 +127,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase, Spli
         return SplitCalculationResult.builder()
                 .splitRuleId(breakdown.splitRuleId())
                 .ruleName(breakdown.ruleName())
-                .splitType(com.dualis.api.domain.model.SplitType.valueOf(breakdown.splitType().name()))
+                .splitType(breakdown.splitType())
                 .totalAmount(breakdown.totalExpense().amount())
                 .partnerAAmount(breakdown.partnerAShare().amount())
                 .partnerBAmount(breakdown.partnerBShare().amount())
@@ -156,7 +150,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase, Spli
                 .id(rule.getId())
                 .workspaceId(rule.getWorkspaceId())
                 .name(rule.getName())
-                .splitType(com.dualis.api.domain.model.SplitType.valueOf(rule.getSplitType().name()))
+                .splitType(rule.getSplitType())
                 .partnerAPercentage(rule.getPartnerAPercentage())
                 .partnerBPercentage(rule.getPartnerBPercentage())
                 .partnerAIncome(rule.getPartnerAIncome())
