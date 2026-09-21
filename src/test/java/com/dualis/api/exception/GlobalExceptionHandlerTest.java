@@ -1,6 +1,6 @@
 package com.dualis.api.exception;
 
-import com.dualis.api.dto.response.ErrorResponse;
+import com.dualis.api.shared.dto.response.ErrorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
