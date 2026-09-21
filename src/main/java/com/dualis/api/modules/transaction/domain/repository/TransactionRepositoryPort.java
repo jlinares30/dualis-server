@@ -1,7 +1,7 @@
 package com.dualis.api.modules.transaction.domain.repository;
 
-import com.dualis.api.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -29,6 +29,16 @@ public interface TransactionRepositoryPort {
             OffsetDateTime endDate,
             String search,
             Pageable pageable
+    );
+
+    List<Transaction> findTransactions(
+            UUID workspaceId,
+            UUID accountId,
+            TransactionType type,
+            UUID categoryId,
+            OffsetDateTime startDate,
+            OffsetDateTime endDate,
+            String search
     );
 
     void delete(UUID id);

@@ -1,7 +1,6 @@
 package com.dualis.api.modules.transaction.domain.model;
 
-import com.dualis.api.domain.model.CategoryNature;
-import com.dualis.api.domain.model.TransactionType;
+import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.Builder;
 import lombok.Getter;

@@ -1,9 +1,9 @@
 package com.dualis.api.modules.transaction.application.usecase;
 
-import com.dualis.api.domain.model.TransactionType;
-import com.dualis.api.dto.request.CreateTransactionRequest;
-import com.dualis.api.dto.request.UpdateTransactionRequest;
-import com.dualis.api.dto.response.TransactionResponse;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import com.dualis.api.modules.transaction.dto.request.CreateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.request.UpdateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.response.TransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

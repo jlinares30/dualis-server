@@ -1,14 +1,15 @@
 package com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence;
 
-import com.dualis.api.domain.model.Account;
-import com.dualis.api.domain.model.TransactionType;
-import com.dualis.api.domain.repository.AccountRepository;
-import com.dualis.api.domain.repository.TransactionRepository;
-import com.dualis.api.domain.specification.TransactionSpecification;
 import com.dualis.api.exception.ResourceNotFoundException;
+import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.entity.AccountJpaEntity;
+import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.repository.SpringDataAccountRepository;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
+import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.entity.TransactionJpaEntity;
 import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.mapper.TransactionPersistenceMapper;
+import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.repository.SpringDataTransactionRepository;
+import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.specification.TransactionSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,23 +25,23 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransactionPersistenceAdapter implements TransactionRepositoryPort {
 
-    private final TransactionRepository transactionRepository;
-    private final AccountRepository accountRepository;
+    private final SpringDataTransactionRepository transactionRepository;
+    private final SpringDataAccountRepository accountRepository;
     private final TransactionPersistenceMapper mapper;
 
     @Override
     public Transaction save(Transaction transaction) {
-        Account primaryAccount = accountRepository.findById(transaction.getAccountId())
+        AccountJpaEntity primaryAccount = accountRepository.findById(transaction.getAccountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + transaction.getAccountId()));
 
-        Account targetAccount = null;
+        AccountJpaEntity targetAccount = null;
         if (transaction.getTargetAccountId() != null) {
             targetAccount = accountRepository.findById(transaction.getTargetAccountId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target account not found with id: " + transaction.getTargetAccountId()));
         }
 
-        com.dualis.api.domain.model.Transaction entity = mapper.toEntity(transaction, primaryAccount, targetAccount);
-        com.dualis.api.domain.model.Transaction saved = transactionRepository.save(entity);
+        TransactionJpaEntity entity = mapper.toEntity(transaction, primaryAccount, targetAccount);
+        TransactionJpaEntity saved = transactionRepository.save(entity);
         return mapper.toDomain(saved);
     }
 
@@ -58,7 +59,7 @@ public class TransactionPersistenceAdapter implements TransactionRepositoryPort 
 
     @Override
     public List<Transaction> findByWorkspaceIdAndType(UUID workspaceId, TransactionType type) {
-        Specification<com.dualis.api.domain.model.Transaction> spec = TransactionSpecification.filterTransactions(
+        Specification<TransactionJpaEntity> spec = TransactionSpecification.filterTransactions(
                 workspaceId, null, type, null, null, null, null
         );
         return transactionRepository.findAll(spec).stream()
@@ -77,10 +78,28 @@ public class TransactionPersistenceAdapter implements TransactionRepositoryPort 
             String search,
             Pageable pageable
     ) {
-        Specification<com.dualis.api.domain.model.Transaction> spec = TransactionSpecification.filterTransactions(
+        Specification<TransactionJpaEntity> spec = TransactionSpecification.filterTransactions(
                 workspaceId, accountId, type, categoryId, startDate, endDate, search
         );
         return transactionRepository.findAll(spec, pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Transaction> findTransactions(
+            UUID workspaceId,
+            UUID accountId,
+            TransactionType type,
+            UUID categoryId,
+            OffsetDateTime startDate,
+            OffsetDateTime endDate,
+            String search
+    ) {
+        Specification<TransactionJpaEntity> spec = TransactionSpecification.filterTransactions(
+                workspaceId, accountId, type, categoryId, startDate, endDate, search
+        );
+        return transactionRepository.findAll(spec).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override

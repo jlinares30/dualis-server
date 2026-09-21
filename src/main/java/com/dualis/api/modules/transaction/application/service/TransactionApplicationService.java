@@ -1,17 +1,16 @@
 package com.dualis.api.modules.transaction.application.service;
 
-import com.dualis.api.domain.model.Account;
-import com.dualis.api.domain.model.AccountStatus;
-import com.dualis.api.domain.model.TransactionType;
-import com.dualis.api.domain.repository.AccountRepository;
-import com.dualis.api.dto.request.CreateTransactionRequest;
-import com.dualis.api.dto.request.UpdateTransactionRequest;
-import com.dualis.api.dto.response.TransactionResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
+import com.dualis.api.modules.account.domain.model.Account;
+import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
 import com.dualis.api.modules.transaction.application.usecase.ManageTransactionUseCase;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
-import com.dualis.api.service.TransactionService;
+import com.dualis.api.modules.transaction.dto.request.CreateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.request.UpdateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.response.TransactionResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,10 +25,10 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class TransactionApplicationService implements ManageTransactionUseCase, TransactionService {
+public class TransactionApplicationService implements ManageTransactionUseCase {
 
     private final TransactionRepositoryPort transactionRepository;
-    private final AccountRepository accountRepository;
+    private final AccountRepositoryPort accountRepository;
 
     @Override
     @Transactional
@@ -128,7 +127,8 @@ public class TransactionApplicationService implements ManageTransactionUseCase, 
         // Apply new balance impact
         applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
 
-        Money moneyAmount = Money.of(request.getAmount(), request.getCurrency() != null ? request.getCurrency() : Money.DEFAULT_CURRENCY);
+        String currency = transaction.getAmount() != null ? transaction.getAmount().currency() : Money.DEFAULT_CURRENCY;
+        Money moneyAmount = Money.of(request.getAmount(), currency);
 
         transaction.updateDetails(
                 primaryAccount.getId(),
@@ -160,15 +160,15 @@ public class TransactionApplicationService implements ManageTransactionUseCase, 
     private void revertBalanceImpact(Transaction transaction) {
         Account primaryAccount = findAccountById(transaction.getAccountId());
         Account targetAccount = transaction.getTargetAccountId() != null ? findAccountById(transaction.getTargetAccountId()) : null;
-        BigDecimal amount = transaction.getAmount().amount();
+        Money amount = transaction.getAmount();
 
         switch (transaction.getType()) {
-            case INCOME -> primaryAccount.setBalance(primaryAccount.getBalance().subtract(amount));
-            case EXPENSE -> primaryAccount.setBalance(primaryAccount.getBalance().add(amount));
+            case INCOME -> primaryAccount.debit(amount);
+            case EXPENSE -> primaryAccount.credit(amount);
             case TRANSFER -> {
-                primaryAccount.setBalance(primaryAccount.getBalance().add(amount));
+                primaryAccount.credit(amount);
                 if (targetAccount != null) {
-                    targetAccount.setBalance(targetAccount.getBalance().subtract(amount));
+                    targetAccount.debit(amount);
                     accountRepository.save(targetAccount);
                 }
             }
@@ -176,13 +176,14 @@ public class TransactionApplicationService implements ManageTransactionUseCase, 
         accountRepository.save(primaryAccount);
     }
 
-    private void applyBalanceImpact(Account primaryAccount, Account targetAccount, TransactionType type, BigDecimal amount) {
+    private void applyBalanceImpact(Account primaryAccount, Account targetAccount, TransactionType type, BigDecimal amountVal) {
+        Money amount = Money.of(amountVal, primaryAccount.getBalance() != null ? primaryAccount.getBalance().currency() : Money.DEFAULT_CURRENCY);
         switch (type) {
-            case INCOME -> primaryAccount.setBalance(primaryAccount.getBalance().add(amount));
-            case EXPENSE -> primaryAccount.setBalance(primaryAccount.getBalance().subtract(amount));
+            case INCOME -> primaryAccount.credit(amount);
+            case EXPENSE -> primaryAccount.debit(amount);
             case TRANSFER -> {
-                primaryAccount.setBalance(primaryAccount.getBalance().subtract(amount));
-                targetAccount.setBalance(targetAccount.getBalance().add(amount));
+                primaryAccount.debit(amount);
+                targetAccount.credit(amount);
                 accountRepository.save(targetAccount);
             }
         }

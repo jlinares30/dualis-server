@@ -1,0 +1,84 @@
+package com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.entity;
+
+import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.entity.AccountJpaEntity;
+import com.dualis.api.modules.category.domain.model.CategoryNature;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "transactions")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TransactionJpaEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "workspace_id", nullable = false)
+    private UUID workspaceId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
+    private AccountJpaEntity account;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_account_id")
+    private AccountJpaEntity targetAccount;
+
+    @Column(name = "category_id")
+    private UUID categoryId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 20)
+    private TransactionType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category_nature", length = 20)
+    private CategoryNature categoryNature;
+
+    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal amount;
+
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency;
+
+    @Column(name = "description", length = 255)
+    private String description;
+
+    @Column(name = "transaction_date", nullable = false)
+    private OffsetDateTime transactionDate;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+        if (transactionDate == null) {
+            transactionDate = now;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = OffsetDateTime.now();
+    }
+}

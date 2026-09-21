@@ -1,16 +1,17 @@
 package com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.mapper;
 
-import com.dualis.api.domain.model.Account;
-import com.dualis.api.domain.model.Transaction;
+import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.entity.AccountJpaEntity;
+import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.entity.TransactionJpaEntity;
 import com.dualis.api.shared.domain.valueobject.Money;
 import org.springframework.stereotype.Component;
 
 @Component
 public class TransactionPersistenceMapper {
 
-    public com.dualis.api.modules.transaction.domain.model.Transaction toDomain(Transaction entity) {
+    public Transaction toDomain(TransactionJpaEntity entity) {
         if (entity == null) return null;
-        return com.dualis.api.modules.transaction.domain.model.Transaction.builder()
+        return Transaction.builder()
                 .id(entity.getId())
                 .workspaceId(entity.getWorkspaceId())
                 .accountId(entity.getAccount() != null ? entity.getAccount().getId() : null)
@@ -28,13 +29,13 @@ public class TransactionPersistenceMapper {
                 .build();
     }
 
-    public Transaction toEntity(
-            com.dualis.api.modules.transaction.domain.model.Transaction domain,
-            Account primaryAccount,
-            Account targetAccount
+    public TransactionJpaEntity toEntity(
+            Transaction domain,
+            AccountJpaEntity primaryAccount,
+            AccountJpaEntity targetAccount
     ) {
         if (domain == null) return null;
-        return Transaction.builder()
+        return TransactionJpaEntity.builder()
                 .id(domain.getId())
                 .workspaceId(domain.getWorkspaceId())
                 .account(primaryAccount)

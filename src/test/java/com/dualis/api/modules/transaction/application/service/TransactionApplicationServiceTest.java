@@ -1,14 +1,15 @@
 package com.dualis.api.modules.transaction.application.service;
 
-import com.dualis.api.domain.model.Account;
-import com.dualis.api.domain.model.AccountStatus;
-import com.dualis.api.domain.model.CategoryNature;
-import com.dualis.api.domain.model.TransactionType;
-import com.dualis.api.domain.repository.AccountRepository;
-import com.dualis.api.dto.request.CreateTransactionRequest;
-import com.dualis.api.dto.response.TransactionResponse;
+import com.dualis.api.modules.account.domain.model.Account;
+import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.domain.model.AccountType;
+import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
+import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
+import com.dualis.api.modules.transaction.dto.request.CreateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.response.TransactionResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ class TransactionApplicationServiceTest {
     private TransactionRepositoryPort transactionRepository;
 
     @Mock
-    private AccountRepository accountRepository;
+    private AccountRepositoryPort accountRepository;
 
     @InjectMocks
     private TransactionApplicationService transactionApplicationService;
@@ -55,16 +56,20 @@ class TransactionApplicationServiceTest {
                 .id(primaryAccountId)
                 .workspaceId(workspaceId)
                 .name("Primary Account")
-                .balance(new BigDecimal("500.00"))
+                .type(AccountType.BANK)
+                .balance(Money.of(new BigDecimal("500.00"), "USD"))
                 .status(AccountStatus.ACTIVE)
+                .createdAt(OffsetDateTime.now())
                 .build();
 
         targetAccount = Account.builder()
                 .id(targetAccountId)
                 .workspaceId(workspaceId)
                 .name("Target Account")
-                .balance(new BigDecimal("200.00"))
+                .type(AccountType.BANK)
+                .balance(Money.of(new BigDecimal("200.00"), "USD"))
                 .status(AccountStatus.ACTIVE)
+                .createdAt(OffsetDateTime.now())
                 .build();
     }
 
@@ -98,7 +103,7 @@ class TransactionApplicationServiceTest {
         TransactionResponse response = transactionApplicationService.createTransaction(request);
 
         assertThat(response).isNotNull();
-        assertThat(primaryAccount.getBalance()).isEqualTo(new BigDecimal("650.00"));
+        assertThat(primaryAccount.getBalance().amount()).isEqualTo(new BigDecimal("650.00"));
         verify(accountRepository, times(1)).save(primaryAccount);
         verify(transactionRepository, times(1)).save(any(Transaction.class));
     }
@@ -137,8 +142,8 @@ class TransactionApplicationServiceTest {
         TransactionResponse response = transactionApplicationService.createTransaction(request);
 
         assertThat(response).isNotNull();
-        assertThat(primaryAccount.getBalance()).isEqualTo(new BigDecimal("400.00"));
-        assertThat(targetAccount.getBalance()).isEqualTo(new BigDecimal("300.00"));
+        assertThat(primaryAccount.getBalance().amount()).isEqualTo(new BigDecimal("400.00"));
+        assertThat(targetAccount.getBalance().amount()).isEqualTo(new BigDecimal("300.00"));
         verify(accountRepository, times(1)).save(primaryAccount);
         verify(accountRepository, times(1)).save(targetAccount);
     }
