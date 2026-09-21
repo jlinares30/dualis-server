@@ -1,10 +1,10 @@
 package com.dualis.api.modules.auth.application.usecase;
 
-import com.dualis.api.dto.request.LoginRequest;
-import com.dualis.api.dto.request.RegisterRequest;
-import com.dualis.api.dto.request.UpdateProfileRequest;
-import com.dualis.api.dto.response.AuthResponse;
-import com.dualis.api.dto.response.UserProfileResponse;
+import com.dualis.api.modules.auth.dto.request.LoginRequest;
+import com.dualis.api.modules.auth.dto.request.RegisterRequest;
+import com.dualis.api.modules.auth.dto.request.UpdateProfileRequest;
+import com.dualis.api.modules.auth.dto.response.AuthResponse;
+import com.dualis.api.modules.auth.dto.response.UserProfileResponse;
 
 public interface ManageAuthUseCase {
     AuthResponse register(RegisterRequest request);

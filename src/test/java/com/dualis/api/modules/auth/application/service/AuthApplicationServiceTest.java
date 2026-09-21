@@ -1,8 +1,8 @@
 package com.dualis.api.modules.auth.application.service;
 
-import com.dualis.api.dto.request.LoginRequest;
-import com.dualis.api.dto.request.RegisterRequest;
-import com.dualis.api.dto.response.AuthResponse;
+import com.dualis.api.modules.auth.dto.request.LoginRequest;
+import com.dualis.api.modules.auth.dto.request.RegisterRequest;
+import com.dualis.api.modules.auth.dto.response.AuthResponse;
 import com.dualis.api.modules.auth.domain.model.User;
 import com.dualis.api.modules.auth.domain.model.UserRole;
 import com.dualis.api.modules.auth.domain.repository.UserRepositoryPort;
