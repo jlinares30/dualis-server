@@ -1,10 +1,10 @@
 package com.dualis.api.modules.account.application.service;
 
-import com.dualis.api.domain.model.AccountStatus;
-import com.dualis.api.domain.model.AccountType;
-import com.dualis.api.dto.request.CreateAccountRequest;
-import com.dualis.api.dto.request.UpdateAccountRequest;
-import com.dualis.api.dto.response.AccountResponse;
+import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.domain.model.AccountType;
+import com.dualis.api.modules.account.dto.request.CreateAccountRequest;
+import com.dualis.api.modules.account.dto.request.UpdateAccountRequest;
+import com.dualis.api.modules.account.dto.response.AccountResponse;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
