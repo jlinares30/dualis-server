@@ -1,6 +1,6 @@
 package com.dualis.api.exception;
 
-import com.dualis.api.dto.response.ErrorResponse;
+import com.dualis.api.shared.dto.response.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
