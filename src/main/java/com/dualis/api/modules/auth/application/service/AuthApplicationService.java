@@ -17,12 +17,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import com.dualis.api.modules.account.domain.model.Account;
+import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.domain.model.AccountType;
+import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
+import com.dualis.api.modules.auth.dto.request.OnboardingRequest;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
+import com.dualis.api.shared.domain.valueobject.Money;
 
 @Service
 @RequiredArgsConstructor
 public class AuthApplicationService implements ManageAuthUseCase {
 
     private final UserRepositoryPort userRepository;
+    private final WorkspaceRepositoryPort workspaceRepository;
+    private final AccountRepositoryPort accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -56,6 +71,7 @@ public class AuthApplicationService implements ManageAuthUseCase {
                 .firstName(savedUser.getFirstName())
                 .lastName(savedUser.getLastName())
                 .role(savedUser.getRole().name())
+                .onboardingCompleted(savedUser.isOnboardingCompleted())
                 .build();
     }
 
@@ -83,6 +99,7 @@ public class AuthApplicationService implements ManageAuthUseCase {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .role(user.getRole().name())
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .build();
     }
 
@@ -104,5 +121,100 @@ public class AuthApplicationService implements ManageAuthUseCase {
         User updated = userRepository.save(user);
 
         return UserProfileResponse.fromDomain(updated);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse completeOnboarding(String email, OnboardingRequest request) {
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+
+        // 1. Update preferred currency if provided
+        String currency = (request.getBaseCurrency() != null && !request.getBaseCurrency().isBlank())
+                ? request.getBaseCurrency().trim().toUpperCase()
+                : (user.getBaseCurrency() != null ? user.getBaseCurrency() : "USD");
+
+        user.updateProfile(user.getFirstName(), user.getLastName(), currency);
+        user.completeOnboarding();
+        User updatedUser = userRepository.save(user);
+
+        // 2. Ensure individual or couple workspace exists for the user
+        List<Workspace> userWorkspaces = workspaceRepository.findWorkspacesByUserEmail(email);
+        Workspace targetWorkspace = null;
+
+        boolean wantsCouple = "COUPLE".equalsIgnoreCase(request.getWorkspaceMode());
+
+        if (wantsCouple) {
+            targetWorkspace = userWorkspaces.stream()
+                    .filter(w -> w.getType() == WorkspaceType.COUPLE)
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetWorkspace == null) {
+                targetWorkspace = Workspace.builder()
+                        .name("Espacio en Pareja")
+                        .description("Finanzas compartidas")
+                        .type(WorkspaceType.COUPLE)
+                        .currency(currency)
+                        .ownerEmail(email)
+                        .isActive(true)
+                        .createdAt(OffsetDateTime.now())
+                        .updatedAt(OffsetDateTime.now())
+                        .build();
+                targetWorkspace.addMember(email, WorkspaceRole.OWNER);
+                if (request.getPartnerEmail() != null && !request.getPartnerEmail().isBlank()) {
+                    targetWorkspace.addMember(request.getPartnerEmail().trim().toLowerCase(), WorkspaceRole.PARTNER);
+                }
+                targetWorkspace = workspaceRepository.save(targetWorkspace);
+            }
+        } else {
+            targetWorkspace = userWorkspaces.stream()
+                    .filter(w -> w.getType() == WorkspaceType.INDIVIDUAL)
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetWorkspace == null) {
+                targetWorkspace = Workspace.builder()
+                        .name("Espacio Personal")
+                        .description("Finanzas personales")
+                        .type(WorkspaceType.INDIVIDUAL)
+                        .currency(currency)
+                        .ownerEmail(email)
+                        .isActive(true)
+                        .createdAt(OffsetDateTime.now())
+                        .updatedAt(OffsetDateTime.now())
+                        .build();
+                targetWorkspace.addMember(email, WorkspaceRole.OWNER);
+                targetWorkspace = workspaceRepository.save(targetWorkspace);
+            }
+        }
+
+        // 3. Create initial financial account if specified
+        if (request.getAccountName() != null && !request.getAccountName().isBlank()) {
+            AccountType accountType;
+            try {
+                accountType = AccountType.valueOf(request.getAccountType().trim().toUpperCase());
+            } catch (Exception e) {
+                accountType = AccountType.SAVINGS;
+            }
+
+            java.math.BigDecimal startBal = request.getInitialBalance() != null ? request.getInitialBalance() : java.math.BigDecimal.ZERO;
+
+            Account initialAccount = Account.builder()
+                    .workspaceId(targetWorkspace.getId())
+                    .name(request.getAccountName().trim())
+                    .type(accountType)
+                    .balance(Money.of(startBal, currency))
+                    .status(AccountStatus.ACTIVE)
+                    .isIncludedInTotal(true)
+                    .description("Cuenta inicial configurada en el onboarding")
+                    .createdAt(OffsetDateTime.now())
+                    .updatedAt(OffsetDateTime.now())
+                    .build();
+
+            accountRepository.save(initialAccount);
+        }
+
+        return UserProfileResponse.fromDomain(updatedUser);
     }
 }

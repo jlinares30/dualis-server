@@ -19,6 +19,7 @@ public class UserPersistenceMapper {
                 .baseCurrency(entity.getBaseCurrency())
                 .role(entity.getRole())
                 .isActive(Boolean.TRUE.equals(entity.getIsActive()))
+                .onboardingCompleted(Boolean.TRUE.equals(entity.getOnboardingCompleted()))
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
@@ -36,6 +37,7 @@ public class UserPersistenceMapper {
                 .baseCurrency(domain.getBaseCurrency())
                 .role(domain.getRole())
                 .isActive(domain.isActive())
+                .onboardingCompleted(domain.isOnboardingCompleted())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

@@ -2,6 +2,7 @@ package com.dualis.api.modules.auth.controller;
 
 import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
 import com.dualis.api.modules.auth.dto.request.LoginRequest;
+import com.dualis.api.modules.auth.dto.request.OnboardingRequest;
 import com.dualis.api.modules.auth.dto.request.RegisterRequest;
 import com.dualis.api.modules.auth.dto.request.UpdateProfileRequest;
 import com.dualis.api.modules.auth.dto.response.AuthResponse;
@@ -83,6 +84,24 @@ public class AuthController {
             @Valid @RequestBody UpdateProfileRequest request) {
         String email = authentication.getName();
         UserProfileResponse profile = authService.updateProfile(email, request);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PostMapping("/onboarding")
+    @Operation(summary = "Complete user onboarding", description = "Sets up preferred currency, initial account, and initial workspace for new user")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Onboarding completed successfully",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid onboarding request parameters",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Missing or invalid JWT token",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<UserProfileResponse> completeOnboarding(
+            Authentication authentication,
+            @Valid @RequestBody OnboardingRequest request) {
+        String email = authentication.getName();
+        UserProfileResponse profile = authService.completeOnboarding(email, request);
         return ResponseEntity.ok(profile);
     }
 }

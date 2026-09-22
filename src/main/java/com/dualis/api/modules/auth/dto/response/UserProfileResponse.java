@@ -33,6 +33,9 @@ public class UserProfileResponse {
     @Schema(description = "User role", example = "ROLE_USER")
     private String role;
 
+    @Schema(description = "Whether user has completed the onboarding wizard", example = "false")
+    private boolean onboardingCompleted;
+
     @Schema(description = "Creation timestamp")
     private OffsetDateTime createdAt;
 
@@ -48,6 +51,7 @@ public class UserProfileResponse {
                 .lastName(user.getLastName())
                 .baseCurrency(user.getBaseCurrency())
                 .role(user.getRole() != null ? user.getRole().name() : "ROLE_USER")
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

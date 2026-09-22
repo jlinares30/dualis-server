@@ -18,6 +18,7 @@ public class User {
     private String baseCurrency;
     private UserRole role;
     private boolean isActive;
+    private boolean onboardingCompleted;
     private final OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -31,6 +32,11 @@ public class User {
         if (baseCurrency != null && !baseCurrency.isBlank()) {
             this.baseCurrency = baseCurrency.trim();
         }
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    public void completeOnboarding() {
+        this.onboardingCompleted = true;
         this.updatedAt = OffsetDateTime.now();
     }
 }

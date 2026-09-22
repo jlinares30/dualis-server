@@ -34,4 +34,7 @@ public class AuthResponse {
 
     @Schema(description = "User role", example = "ROLE_USER")
     private String role;
+
+    @Schema(description = "Whether user has completed the onboarding wizard", example = "false")
+    private boolean onboardingCompleted;
 }

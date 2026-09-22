@@ -93,4 +93,39 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("jwt.token.here"));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/onboarding - Success")
+    void onboarding_Success() throws Exception {
+        com.dualis.api.modules.auth.dto.request.OnboardingRequest request =
+                com.dualis.api.modules.auth.dto.request.OnboardingRequest.builder()
+                        .baseCurrency("USD")
+                        .accountName("Main Account")
+                        .accountType("SAVINGS")
+                        .initialBalance(new java.math.BigDecimal("500.00"))
+                        .workspaceMode("INDIVIDUAL")
+                        .build();
+
+        UserProfileResponse profileResponse = UserProfileResponse.builder()
+                .id(UUID.randomUUID())
+                .email("jorge@example.com")
+                .firstName("Jorge")
+                .lastName("Linares")
+                .baseCurrency("USD")
+                .role("ROLE_USER")
+                .onboardingCompleted(true)
+                .build();
+
+        when(authService.completeOnboarding(any(), any())).thenReturn(profileResponse);
+
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("jorge@example.com", null, java.util.Collections.emptyList());
+
+        mockMvc.perform(post("/api/v1/auth/onboarding")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.onboardingCompleted").value(true));
+    }
 }

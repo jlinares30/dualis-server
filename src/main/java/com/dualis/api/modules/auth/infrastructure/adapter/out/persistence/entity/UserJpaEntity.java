@@ -42,6 +42,9 @@ public class UserJpaEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "onboarding_completed", nullable = false)
+    private Boolean onboardingCompleted;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -58,6 +61,9 @@ public class UserJpaEntity {
         }
         if (isActive == null) {
             isActive = true;
+        }
+        if (onboardingCompleted == null) {
+            onboardingCompleted = false;
         }
         if (role == null) {
             role = UserRole.ROLE_USER;
