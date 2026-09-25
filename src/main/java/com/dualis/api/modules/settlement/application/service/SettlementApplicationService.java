@@ -6,6 +6,8 @@ import com.dualis.api.modules.settlement.domain.model.Settlement;
 import com.dualis.api.modules.settlement.domain.model.SettlementStatus;
 import com.dualis.api.modules.settlement.domain.model.SplitRule;
 import com.dualis.api.modules.settlement.domain.repository.SettlementRepositoryPort;
+import com.dualis.api.modules.account.domain.model.Account;
+import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
 import com.dualis.api.modules.settlement.domain.repository.SplitRuleRepositoryPort;
 import com.dualis.api.modules.settlement.dto.request.CreateSettlementRequest;
 import com.dualis.api.modules.settlement.dto.response.DebtBalanceSummaryResponse;
@@ -37,6 +39,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     private final SplitRuleRepositoryPort splitRuleRepository;
     private final TransactionRepositoryPort transactionRepository;
     private final WorkspaceRepositoryPort workspaceRepository;
+    private final AccountRepositoryPort accountRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -72,11 +75,36 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
             }
         }
 
+        // 1. Calculate each partner's agreed share
         Money partnerAShare = totalExpenses.percentage(partnerAPercentage);
         Money partnerBShare = totalExpenses.percentage(partnerBPercentage);
 
-        Money partnerAPaid = totalExpenses.divide(new BigDecimal("2"), RoundingMode.HALF_UP);
-        Money partnerBPaid = totalExpenses.subtract(partnerAPaid);
+        // 2. Calculate who actually paid each expense
+        BigDecimal partnerAPaidAcc = BigDecimal.ZERO;
+        BigDecimal partnerBPaidAcc = BigDecimal.ZERO;
+
+        for (Transaction expense : expenses) {
+            BigDecimal expenseAmount = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
+            if (expense.getAccountId() != null) {
+                Optional<Account> accOpt = accountRepository.findById(expense.getAccountId());
+                if (accOpt.isPresent()) {
+                    Account acc = accOpt.get();
+                    Optional<Workspace> accWsOpt = workspaceRepository.findById(acc.getWorkspaceId());
+                    if (accWsOpt.isPresent()) {
+                        String accOwner = accWsOpt.get().getOwnerEmail();
+                        if (accOwner != null && accOwner.equalsIgnoreCase(partnerBEmail)) {
+                            partnerBPaidAcc = partnerBPaidAcc.add(expenseAmount);
+                            continue;
+                        }
+                    }
+                }
+            }
+            // Default to partner A (owner) if account belongs to A or is couple workspace owned by A
+            partnerAPaidAcc = partnerAPaidAcc.add(expenseAmount);
+        }
+
+        Money partnerAPaid = Money.of(partnerAPaidAcc);
+        Money partnerBPaid = Money.of(partnerBPaidAcc);
 
         List<Settlement> completedSettlements = settlementRepository.findByWorkspaceIdAndStatus(workspaceId, SettlementStatus.COMPLETED);
         Money totalSettled = completedSettlements.stream()

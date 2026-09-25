@@ -4,6 +4,7 @@ import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
 import com.dualis.api.modules.account.domain.model.AccountType;
 import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
+import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
 import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
 import com.dualis.api.modules.transaction.domain.model.TransactionType;
@@ -36,6 +37,9 @@ class TransactionApplicationServiceTest {
 
     @Mock
     private AccountRepositoryPort accountRepository;
+
+    @Mock
+    private WorkspaceRepositoryPort workspaceRepository;
 
     @InjectMocks
     private TransactionApplicationService transactionApplicationService;

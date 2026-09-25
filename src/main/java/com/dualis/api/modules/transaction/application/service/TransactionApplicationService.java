@@ -11,6 +11,9 @@ import com.dualis.api.modules.transaction.domain.repository.TransactionRepositor
 import com.dualis.api.modules.transaction.dto.request.CreateTransactionRequest;
 import com.dualis.api.modules.transaction.dto.request.UpdateTransactionRequest;
 import com.dualis.api.modules.transaction.dto.response.TransactionResponse;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +32,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
 
     private final TransactionRepositoryPort transactionRepository;
     private final AccountRepositoryPort accountRepository;
+    private final WorkspaceRepositoryPort workspaceRepository;
 
     @Override
     @Transactional
@@ -194,7 +198,22 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
         Account account = findAccountById(accountId);
 
         if (!account.getWorkspaceId().equals(workspaceId)) {
-            throw new IllegalArgumentException("Account " + accountId + " does not belong to workspace " + workspaceId);
+            boolean isAllowed = false;
+            java.util.Optional<Workspace> targetWsOpt = workspaceRepository.findById(workspaceId);
+            if (targetWsOpt.isPresent() && targetWsOpt.get().getType() == WorkspaceType.COUPLE) {
+                java.util.Optional<Workspace> accountWsOpt = workspaceRepository.findById(account.getWorkspaceId());
+                if (accountWsOpt.isPresent()) {
+                    Workspace accountWs = accountWsOpt.get();
+                    isAllowed = targetWsOpt.get().getMembers().stream()
+                            .anyMatch(member -> member.getUserEmail().equalsIgnoreCase(accountWs.getOwnerEmail())
+                                    || (accountWs.getMembers() != null && accountWs.getMembers().stream()
+                                    .anyMatch(m -> m.getUserEmail().equalsIgnoreCase(member.getUserEmail()))));
+                }
+            }
+
+            if (!isAllowed) {
+                throw new IllegalArgumentException("Account " + accountId + " does not belong to workspace " + workspaceId);
+            }
         }
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new IllegalStateException("Account " + accountId + " is not ACTIVE");
