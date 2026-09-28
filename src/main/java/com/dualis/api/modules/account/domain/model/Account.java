@@ -71,4 +71,8 @@ public class Account {
     public boolean isActive() {
         return this.status == AccountStatus.ACTIVE;
     }
+
+    public String getCurrency() {
+        return this.balance != null ? this.balance.currency() : "USD";
+    }
 }

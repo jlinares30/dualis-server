@@ -22,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -172,7 +174,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             case TRANSFER -> {
                 primaryAccount.credit(amount);
                 if (targetAccount != null) {
-                    targetAccount.debit(amount);
+                    targetAccount.debit(convertCurrencyIfDifferent(amount, targetAccount.getBalance().currency()));
                     accountRepository.save(targetAccount);
                 }
             }
@@ -187,7 +189,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             case EXPENSE -> primaryAccount.debit(amount);
             case TRANSFER -> {
                 primaryAccount.debit(amount);
-                targetAccount.credit(amount);
+                targetAccount.credit(convertCurrencyIfDifferent(amount, targetAccount.getBalance().currency()));
                 accountRepository.save(targetAccount);
             }
         }
@@ -245,4 +247,43 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 .updatedAt(t.getUpdatedAt())
                 .build();
     }
+
+    private static final Map<String, Double> FX_RATES_TO_USD = Map.of(
+            "USD", 1.0,
+            "EUR", 1.08,
+            "PEN", 0.27, // 1 PEN = ~0.27 USD (3.75 PEN per USD)
+            "GBP", 1.28,
+            "MXN", 0.058,
+            "COP", 0.00025,
+            "CLP", 0.0011,
+            "ARS", 0.0011,
+            "BRL", 0.18
+    );
+
+    private Money convertCurrencyIfDifferent(Money sourceMoney, String targetCurrency) {
+        if (sourceMoney == null || sourceMoney.currency().equalsIgnoreCase(targetCurrency)) {
+            return sourceMoney;
+        }
+
+        String fromCurr = sourceMoney.currency().toUpperCase();
+        String toCurr = targetCurrency.toUpperCase();
+
+        Double fromRate = FX_RATES_TO_USD.get(fromCurr);
+        Double toRate = FX_RATES_TO_USD.get(toCurr);
+
+        if (fromRate == null || toRate == null || toRate == 0) {
+            // Fallback: if unknown exchange rate, return same numerical amount in target currency
+            return new Money(sourceMoney.amount(), toCurr);
+        }
+
+        // Amount in USD = amount * fromRate
+        // Amount in target = (amount * fromRate) / toRate
+        BigDecimal fromRateBd = BigDecimal.valueOf(fromRate);
+        BigDecimal toRateBd = BigDecimal.valueOf(toRate);
+        BigDecimal inUsd = sourceMoney.amount().multiply(fromRateBd);
+        BigDecimal convertedAmount = inUsd.divide(toRateBd, 2, RoundingMode.HALF_UP);
+
+        return new Money(convertedAmount, toCurr);
+    }
+
 }

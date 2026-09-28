@@ -6,5 +6,6 @@ public enum AccountType {
     CREDIT_CARD,
     INVESTMENT,
     SAVINGS,
-    LOAN
+    LOAN,
+    DIGITAL
 }
