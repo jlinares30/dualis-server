@@ -6,6 +6,7 @@ import com.dualis.api.modules.savingsgoal.domain.model.SavingsGoal;
 import com.dualis.api.modules.savingsgoal.domain.repository.SavingsGoalRepositoryPort;
 import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.request.UpdateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,24 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
 
         goal.deposit(request.getAmount());
+
+        SavingsGoal updated = savingsGoalRepository.save(goal);
+        return SavingsGoalResponse.fromDomain(updated);
+    }
+
+    @Override
+    @Transactional
+    public SavingsGoalResponse updateGoal(UUID goalId, UpdateGoalRequest request) {
+        SavingsGoal goal = savingsGoalRepository.findById(goalId)
+                .orElseThrow(() -> new ResourceNotFoundException(String.valueOf(goalId)));
+
+        goal.updateDetails(
+                request.getName(),
+                request.getTargetAmount(),
+                request.getDeadlineDate(),
+                request.getCategory(),
+                request.getCurrency()
+        );
 
         SavingsGoal updated = savingsGoalRepository.save(goal);
         return SavingsGoalResponse.fromDomain(updated);

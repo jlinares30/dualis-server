@@ -3,6 +3,7 @@ package com.dualis.api.modules.savingsgoal.controller;
 import com.dualis.api.modules.savingsgoal.application.usecase.ManageSavingsGoalUseCase;
 import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.request.UpdateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,15 @@ public class SavingsGoalController {
     public ResponseEntity<SavingsGoalResponse> createGoal(@Valid @RequestBody CreateGoalRequest request) {
         SavingsGoalResponse created = savingsGoalService.createGoal(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update an existing savings goal")
+    public ResponseEntity<SavingsGoalResponse> updateGoal(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateGoalRequest request) {
+        SavingsGoalResponse updated = savingsGoalService.updateGoal(id, request);
+        return ResponseEntity.ok(updated);
     }
 
     @GetMapping

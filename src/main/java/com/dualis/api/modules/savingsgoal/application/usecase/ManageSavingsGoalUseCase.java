@@ -2,6 +2,7 @@ package com.dualis.api.modules.savingsgoal.application.usecase;
 
 import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
+import com.dualis.api.modules.savingsgoal.dto.request.UpdateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
 
 import java.util.List;
@@ -11,5 +12,6 @@ public interface ManageSavingsGoalUseCase {
     SavingsGoalResponse createGoal(CreateGoalRequest request);
     List<SavingsGoalResponse> getGoalsByWorkspace(UUID workspaceId);
     SavingsGoalResponse depositToGoal(UUID goalId, DepositGoalRequest request);
+    SavingsGoalResponse updateGoal(UUID goalId, UpdateGoalRequest request);
     void deleteGoal(UUID goalId);
 }
