@@ -52,14 +52,14 @@ public class BudgetController {
             @ApiResponse(responseCode = "400", description = "Missing or invalid parameters",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<List<BudgetResponse>> getBudgetsByWorkspace(
+    public ResponseEntity<List<BudgetProgressResponse>> getBudgetsByWorkspace(
             @Parameter(description = "Workspace UUID", required = true, example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestParam UUID workspaceId,
             @Parameter(description = "Filter by month (1 to 12)")
             @RequestParam(required = false) Integer month,
             @Parameter(description = "Filter by year (e.g., 2026)")
             @RequestParam(required = false) Integer year) {
-        List<BudgetResponse> budgets = budgetService.getBudgetsByWorkspaceAndPeriod(workspaceId, month, year);
+        List<BudgetProgressResponse> budgets = budgetService.getBudgetsByWorkspaceAndPeriod(workspaceId, month, year);
         return ResponseEntity.ok(budgets);
     }
 

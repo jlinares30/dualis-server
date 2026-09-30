@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface ManageBudgetUseCase {
     BudgetResponse createBudget(CreateBudgetRequest request);
-    List<BudgetResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer month, Integer year);
+    List<BudgetProgressResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer month, Integer year);
     BudgetResponse getBudgetById(UUID id);
     BudgetResponse updateBudget(UUID id, UpdateBudgetRequest request);
     void deleteBudget(UUID id);

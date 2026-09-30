@@ -65,14 +65,14 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<BudgetResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer month, Integer year) {
+    public List<BudgetProgressResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer month, Integer year) {
         List<Budget> list;
         if (month != null && year != null) {
             list = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(workspaceId, month, year);
         } else {
             list = budgetRepository.findByWorkspaceId(workspaceId);
         }
-        return list.stream().map(BudgetResponse::fromDomain).toList();
+        return list.stream().map(b -> getBudgetProgress(b.getId())).toList();
     }
 
     @Override
