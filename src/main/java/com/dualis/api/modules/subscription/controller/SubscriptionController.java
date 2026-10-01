@@ -2,6 +2,8 @@ package com.dualis.api.modules.subscription.controller;
 
 import com.dualis.api.modules.subscription.application.usecase.ManageSubscriptionUseCase;
 import com.dualis.api.modules.subscription.dto.request.CreateSubscriptionRequest;
+import com.dualis.api.modules.subscription.dto.request.SaveSalaryDistributionConfigRequest;
+import com.dualis.api.modules.subscription.dto.response.SalaryDistributionConfigResponse;
 import com.dualis.api.modules.subscription.dto.response.SubscriptionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,7 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/subscriptions")
 @RequiredArgsConstructor
-@Tag(name = "Subscriptions", description = "Endpoints for managing recurring subscriptions and bills")
+@Tag(name = "Subscriptions", description = "Endpoints for managing recurring subscriptions, bills and salary distribution flow")
 public class SubscriptionController {
 
     private final ManageSubscriptionUseCase subscriptionService;
@@ -48,5 +50,22 @@ public class SubscriptionController {
     public ResponseEntity<Void> deleteSubscription(@PathVariable UUID id) {
         subscriptionService.deleteSubscription(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/salary-distribution")
+    @Operation(summary = "Get salary distribution configuration for a workspace and user")
+    public ResponseEntity<SalaryDistributionConfigResponse> getSalaryDistributionConfig(
+            @RequestParam UUID workspaceId,
+            @RequestParam(required = false) String userEmail) {
+        SalaryDistributionConfigResponse response = subscriptionService.getSalaryDistributionConfig(workspaceId, userEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/salary-distribution")
+    @Operation(summary = "Save or update salary distribution configuration")
+    public ResponseEntity<SalaryDistributionConfigResponse> saveSalaryDistributionConfig(
+            @Valid @RequestBody SaveSalaryDistributionConfigRequest request) {
+        SalaryDistributionConfigResponse response = subscriptionService.saveSalaryDistributionConfig(request);
+        return ResponseEntity.ok(response);
     }
 }
