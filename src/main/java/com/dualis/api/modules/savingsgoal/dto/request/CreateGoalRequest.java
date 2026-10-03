@@ -19,6 +19,8 @@ public class CreateGoalRequest {
     @NotNull(message = "workspaceId is required")
     private UUID workspaceId;
 
+    private UUID accountId;
+
     @NotBlank(message = "name is required")
     private String name;
 

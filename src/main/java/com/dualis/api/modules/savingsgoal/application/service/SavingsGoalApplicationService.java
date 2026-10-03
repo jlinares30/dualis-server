@@ -32,6 +32,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
 
         SavingsGoal goal = SavingsGoal.builder()
                 .workspaceId(request.getWorkspaceId())
+                .accountId(request.getAccountId())
                 .name(request.getName())
                 .targetAmount(Money.of(request.getTargetAmount(), currency))
                 .currentAmount(Money.of(initialAmount, currency))
@@ -76,7 +77,8 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
                 request.getTargetAmount(),
                 request.getDeadlineDate(),
                 request.getCategory(),
-                request.getCurrency()
+                request.getCurrency(),
+                request.getAccountId() != null ? request.getAccountId() : goal.getAccountId()
         );
 
         SavingsGoal updated = savingsGoalRepository.save(goal);

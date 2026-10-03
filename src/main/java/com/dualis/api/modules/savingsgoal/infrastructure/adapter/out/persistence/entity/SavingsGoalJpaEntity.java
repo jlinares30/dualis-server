@@ -26,6 +26,9 @@ public class SavingsGoalJpaEntity {
     @Column(nullable = false)
     private UUID workspaceId;
 
+    @Column(name = "account_id")
+    private UUID accountId;
+
     @Column(nullable = false)
     private String name;
 

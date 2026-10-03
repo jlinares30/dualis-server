@@ -1,7 +1,5 @@
 package com.dualis.api.modules.savingsgoal.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
 
@@ -16,13 +14,12 @@ import java.util.UUID;
 @Builder
 public class UpdateGoalRequest {
 
-    // @NotNull(message = "workspaceId is required")
     private UUID workspaceId;
 
-    // @NotBlank(message = "name is required")
+    private UUID accountId;
+
     private String name;
 
-    // @NotNull(message = "targetAmount is required")
     @Positive(message = "targetAmount must be positive")
     private BigDecimal targetAmount;
 

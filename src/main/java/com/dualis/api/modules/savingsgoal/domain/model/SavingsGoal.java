@@ -16,6 +16,7 @@ public class SavingsGoal {
 
     private final UUID id;
     private final UUID workspaceId;
+    private UUID accountId;
     private String name;
     private Money targetAmount;
     private Money currentAmount;
@@ -34,7 +35,7 @@ public class SavingsGoal {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    public void updateDetails(String name, BigDecimal targetAmount, LocalDate deadlineDate, String category, String currency) {
+    public void updateDetails(String name, BigDecimal targetAmount, LocalDate deadlineDate, String category, String currency, UUID accountId) {
         if (name != null && !name.isBlank()) {
             this.name = name.trim();
         }
@@ -48,6 +49,7 @@ public class SavingsGoal {
         if (category != null) {
             this.category = category;
         }
+        this.accountId = accountId;
         this.updatedAt = OffsetDateTime.now();
     }
 
@@ -58,12 +60,5 @@ public class SavingsGoal {
         BigDecimal current = currentAmount != null ? currentAmount.amount() : BigDecimal.ZERO;
         return current.multiply(new BigDecimal("100"))
                 .divide(targetAmount.amount(), 2, RoundingMode.HALF_UP);
-    }
-
-    public boolean isGoalReached() {
-        if (targetAmount == null || currentAmount == null) {
-            return false;
-        }
-        return currentAmount.amount().compareTo(targetAmount.amount()) >= 0;
     }
 }

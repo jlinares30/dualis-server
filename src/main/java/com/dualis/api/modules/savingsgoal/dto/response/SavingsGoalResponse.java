@@ -17,6 +17,7 @@ public class SavingsGoalResponse {
 
     private UUID id;
     private UUID workspaceId;
+    private UUID accountId;
     private String name;
     private BigDecimal targetAmount;
     private BigDecimal currentAmount;
@@ -31,6 +32,7 @@ public class SavingsGoalResponse {
         return SavingsGoalResponse.builder()
                 .id(goal.getId())
                 .workspaceId(goal.getWorkspaceId())
+                .accountId(goal.getAccountId())
                 .name(goal.getName())
                 .targetAmount(goal.getTargetAmount() != null ? goal.getTargetAmount().amount() : null)
                 .currentAmount(goal.getCurrentAmount() != null ? goal.getCurrentAmount().amount() : BigDecimal.ZERO)
