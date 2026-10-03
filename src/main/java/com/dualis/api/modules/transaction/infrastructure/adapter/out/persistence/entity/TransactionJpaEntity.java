@@ -54,6 +54,15 @@ public class TransactionJpaEntity {
     @Column(name = "description", length = 255)
     private String description;
 
+    @Column(name = "exchange_rate", precision = 19, scale = 6)
+    private BigDecimal exchangeRate;
+
+    @Column(name = "original_amount", precision = 15, scale = 2)
+    private BigDecimal originalAmount;
+
+    @Column(name = "original_currency", length = 10)
+    private String originalCurrency;
+
     @Column(name = "transaction_date", nullable = false)
     private OffsetDateTime transactionDate;
 

@@ -31,6 +31,9 @@ public class TransactionResponse {
     private BigDecimal amount;
     private String currency;
     private String description;
+    private BigDecimal exchangeRate;
+    private BigDecimal originalAmount;
+    private String originalCurrency;
     private OffsetDateTime transactionDate;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -50,6 +53,9 @@ public class TransactionResponse {
                 .amount(t.getAmount() != null ? t.getAmount().amount() : null)
                 .currency(t.getAmount() != null ? t.getAmount().currency() : Money.DEFAULT_CURRENCY)
                 .description(t.getDescription())
+                .exchangeRate(t.getExchangeRate())
+                .originalAmount(t.getOriginalAmount())
+                .originalCurrency(t.getOriginalCurrency())
                 .transactionDate(t.getTransactionDate())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

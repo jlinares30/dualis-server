@@ -46,4 +46,10 @@ public class CreateTransactionRequest {
     private String description;
 
     private OffsetDateTime transactionDate;
+
+    private BigDecimal exchangeRate;
+
+    private BigDecimal originalAmount;
+
+    private String originalCurrency;
 }

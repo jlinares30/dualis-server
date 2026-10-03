@@ -5,6 +5,7 @@ import com.dualis.api.shared.domain.valueobject.Money;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -23,6 +24,9 @@ public class Transaction {
     private CategoryNature categoryNature;
     private Money amount;
     private String description;
+    private BigDecimal exchangeRate;
+    private BigDecimal originalAmount;
+    private String originalCurrency;
     private OffsetDateTime transactionDate;
     private final OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
