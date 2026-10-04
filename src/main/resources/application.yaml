@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+
 spring:
   application:
     name: dualis-api
@@ -25,4 +28,5 @@ spring:
 
 app:
   jwt:
-    expiration-ms: 7200000 # 2 horas (7,200,000 ms)
+    secret: ${APP_JWT_SECRET:DualisSecureSecretKeyForJWTTokenGeneration20261234567890}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:7200000}

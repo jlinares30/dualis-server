@@ -5,7 +5,7 @@ WORKDIR /app
 # Copiamos primero las dependencias de Maven para usar la caché de Docker
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline -B
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
 # Copiamos el código fuente y construimos el JAR
 COPY src ./src
