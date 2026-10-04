@@ -61,4 +61,11 @@ public class SavingsGoal {
         return current.multiply(new BigDecimal("100"))
                 .divide(targetAmount.amount(), 2, RoundingMode.HALF_UP);
     }
+
+    public boolean isGoalReached() {
+        if (targetAmount == null || currentAmount == null) {
+            return false;
+        }
+        return currentAmount.amount().compareTo(targetAmount.amount()) >= 0;
+    }
 }

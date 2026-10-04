@@ -95,8 +95,23 @@ class BudgetControllerTest {
     @Test
     @DisplayName("GET /api/v1/budgets - Should return budgets for workspace")
     void getBudgetsByWorkspace_ShouldReturnList() throws Exception {
+        BudgetProgressResponse progress = BudgetProgressResponse.builder()
+                .budgetId(budgetId)
+                .workspaceId(workspaceId)
+                .categoryId(categoryId)
+                .name("Monthly Groceries Limit")
+                .limitAmount(new BigDecimal("500.00"))
+                .spentAmount(new BigDecimal("350.00"))
+                .remainingAmount(new BigDecimal("150.00"))
+                .spentPercentage(new BigDecimal("70.00"))
+                .currency("USD")
+                .periodMonth(8)
+                .periodYear(2026)
+                .status(BudgetStatus.ON_TRACK)
+                .build();
+
         when(budgetService.getBudgetsByWorkspaceAndPeriod(eq(workspaceId), eq(8), eq(2026)))
-                .thenReturn(List.of(budgetResponse));
+                .thenReturn(List.of(progress));
 
         mockMvc.perform(get("/api/v1/budgets")
                         .param("workspaceId", workspaceId.toString())
