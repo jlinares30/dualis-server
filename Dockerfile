@@ -20,5 +20,5 @@ COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-# Ejecutamos la aplicación
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Ejecutamos la aplicación con optimización de memoria para contenedores (Render 512MB RAM)
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
