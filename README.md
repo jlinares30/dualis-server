@@ -84,6 +84,14 @@ Dualis API is an enterprise-grade RESTful backend service built for personal and
 - Offline Push Sync (`POST /api/v1/sync/push`): Batch upload of transactions recorded while offline with balance adjustment execution.
 - Conflict resolution strategy: Server-Last-Write-Wins using `updatedAt` timestamps.
 
+### 11. Investments Management Module
+- Track investment portfolios (Stocks, Crypto, Real Estate, Mutual Funds, Fixed Term).
+- Real-time performance tracking with current values, initial invested amounts, and ROI calculations.
+
+### 12. Savings Goals & Salary Distribution Module
+- Define customizable savings goals with target amounts, deadlines, and linked bank accounts.
+- Automated salary distribution rules allocating income across expenses, savings, investments, and leisure.
+
 ---
 
 ## Database Migrations Schema (Flyway)
@@ -96,6 +104,11 @@ Dualis API is an enterprise-grade RESTful backend service built for personal and
 - `V6__create_workspaces_table.sql`: Creates `workspaces` and `workspace_members` tables.
 - `V7__create_settlements_table.sql`: Creates `settlements` table for debt payments.
 - `V8__create_users_table.sql`: Creates `users` table for security credentials.
+- `V9__add_onboarding_completed_to_users.sql`: Adds `onboarding_completed` flag to user entity.
+- `V10__create_investments_table.sql`: Creates `investments` portfolio table.
+- `V11__create_salary_distribution_configs_table.sql`: Creates `salary_distribution_configs` table.
+- `V12__add_exchange_rate_to_transactions.sql`: Adds multi-currency exchange rate tracking to transactions.
+- `V13__add_account_id_to_savings_goals.sql`: Links savings goals to specific bank accounts.
 
 ---
 
@@ -156,7 +169,7 @@ Dualis API is an enterprise-grade RESTful backend service built for personal and
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/v1/budgets` | Create monthly budget limit |
-| GET | `/api/v1/budgets?workspaceId={id}` | List workspace monthly budgets |
+| GET | `/api/v1/budgets?workspaceId={id}` | List workspace monthly budgets with progress |
 | GET | `/api/v1/budgets/{id}` | Get budget details |
 | GET | `/api/v1/budgets/{id}/progress` | Calculate real-time spending progress and status |
 | PUT | `/api/v1/budgets/{id}` | Update budget limit |
@@ -179,6 +192,25 @@ Dualis API is an enterprise-grade RESTful backend service built for personal and
 | GET | `/api/v1/settlements?workspaceId={id}` | List settlement records |
 | PATCH | `/api/v1/settlements/{id}/complete` | Mark settlement payment completed |
 | DELETE | `/api/v1/settlements/{id}` | Cancel settlement record |
+
+### Savings Goals (Protected)
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/savings-goals` | Create a savings goal |
+| GET | `/api/v1/savings-goals?workspaceId={id}` | List savings goals for workspace |
+| GET | `/api/v1/savings-goals/{id}` | Get savings goal details |
+| PUT | `/api/v1/savings-goals/{id}` | Update savings goal |
+| POST | `/api/v1/savings-goals/{id}/deposit` | Deposit funds towards savings goal |
+| DELETE | `/api/v1/savings-goals/{id}` | Delete savings goal |
+
+### Investments (Protected)
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/investments` | Create investment asset |
+| GET | `/api/v1/investments?workspaceId={id}` | List workspace investments |
+| GET | `/api/v1/investments/{id}` | Get investment details |
+| PUT | `/api/v1/investments/{id}` | Update investment asset |
+| DELETE | `/api/v1/investments/{id}` | Delete investment record |
 
 ### Dashboard (Protected)
 | Method | Endpoint | Description |
@@ -206,6 +238,37 @@ Swagger UI documentation includes interactive JWT authorization at:
 
 ---
 
+## Deployment & Docker Configuration
+
+Dualis API is production-ready for deployment on **Render**, **Docker**, or any PaaS container platform.
+
+### Environment Variables
+
+| Variable | Description | Default / Example |
+|---|---|---|
+| `PORT` / `SERVER_PORT` | Application HTTP Port | `8080` (or `10000` on Render) |
+| `DB_URL` | PostgreSQL JDBC Connection URL | `jdbc:postgresql://<host>:5432/<database>` |
+| `DB_USERNAME` | Database username | `postgres` |
+| `DB_PASSWORD` | Database user password | — |
+| `APP_JWT_SECRET` | Secret key for JWT signing (HMAC-SHA256) | Custom strong secret (256-bit) |
+| `APP_JWT_EXPIRATION_MS` | Access token lifespan in milliseconds | `7200000` (2 hours) |
+
+### Docker Build & Run Locally
+```bash
+# Build multi-stage Docker image
+docker build -t dualis-api:latest .
+
+# Run container with environment variables
+docker run -p 8080:8080 \
+  -e DB_URL=jdbc:postgresql://localhost:5432/dualis_db \
+  -e DB_USERNAME=postgres \
+  -e DB_PASSWORD=your_password \
+  -e APP_JWT_SECRET=your_secret_key \
+  dualis-api:latest
+```
+
+---
+
 ## Local Setup and Build Instructions
 
 ### Prerequisites
@@ -215,16 +278,20 @@ Swagger UI documentation includes interactive JWT authorization at:
 
 ### Environment Configuration (`application.yaml`)
 ```yaml
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/dualis_db
-    username: postgres
-    password: postgres_password
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dualis_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:12345678}
   jpa:
     hibernate:
       ddl-auto: update
   flyway:
     enabled: true
+    baseline-on-migrate: true
     validate-on-migrate: false
 ```
 
@@ -244,7 +311,7 @@ spring:
 
 ## Testing Architecture
 
-The project contains unit and integration tests covering all service logic and REST controllers:
+The project contains comprehensive unit and integration tests covering all service logic and REST controllers:
 
 - Service Unit Tests: `AccountServiceImplTest`, `TransactionServiceImplTest`, `SplitRuleServiceImplTest`, `BudgetServiceImplTest`, `CategoryServiceImplTest`, `WorkspaceServiceImplTest`, `SettlementServiceImplTest`, `DashboardServiceImplTest`, `AuthServiceImplTest`, `SyncServiceImplTest`.
 - Controller Integration Tests: `AccountControllerTest`, `TransactionControllerTest`, `SplitRuleControllerTest`, `BudgetControllerTest`, `CategoryControllerTest`, `WorkspaceControllerTest`, `SettlementControllerTest`, `DashboardControllerTest`, `AuthControllerTest`, `SyncControllerTest`.
