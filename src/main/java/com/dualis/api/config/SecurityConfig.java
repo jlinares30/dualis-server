@@ -1,4 +1,4 @@
-﻿package com.dualis.api.config;
+package com.dualis.api.config;
 
 import com.dualis.api.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
