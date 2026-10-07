@@ -12,6 +12,7 @@ public interface ManageSavingsGoalUseCase {
     SavingsGoalResponse createGoal(CreateGoalRequest request);
     List<SavingsGoalResponse> getGoalsByWorkspace(UUID workspaceId);
     SavingsGoalResponse depositToGoal(UUID goalId, DepositGoalRequest request);
+    SavingsGoalResponse withdrawFromGoal(UUID goalId, com.dualis.api.modules.savingsgoal.dto.request.WithdrawGoalRequest request);
     SavingsGoalResponse updateGoal(UUID goalId, UpdateGoalRequest request);
     void deleteGoal(UUID goalId);
 }

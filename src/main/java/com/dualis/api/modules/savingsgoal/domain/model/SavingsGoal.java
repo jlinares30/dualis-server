@@ -35,13 +35,30 @@ public class SavingsGoal {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    public void updateDetails(String name, BigDecimal targetAmount, LocalDate deadlineDate, String category, String currency, UUID accountId) {
+    public void withdraw(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Withdraw amount must be positive");
+        }
+        String currency = this.currentAmount != null ? this.currentAmount.currency() : (this.targetAmount != null ? this.targetAmount.currency() : "PEN");
+        BigDecimal current = this.currentAmount != null ? this.currentAmount.amount() : BigDecimal.ZERO;
+        if (amount.compareTo(current) > 0) {
+            throw new IllegalArgumentException("Withdraw amount cannot exceed current saved amount");
+        }
+        this.currentAmount = Money.of(current.subtract(amount), currency);
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    public void updateDetails(String name, BigDecimal targetAmount, BigDecimal currentAmount, LocalDate deadlineDate, String category, String currency, UUID accountId) {
         if (name != null && !name.isBlank()) {
             this.name = name.trim();
         }
         if (targetAmount != null) {
             String curr = currency != null ? currency : (this.targetAmount != null ? this.targetAmount.currency() : "PEN");
             this.targetAmount = Money.of(targetAmount, curr);
+        }
+        if (currentAmount != null && currentAmount.compareTo(BigDecimal.ZERO) >= 0) {
+            String curr = currency != null ? currency : (this.currentAmount != null ? this.currentAmount.currency() : "PEN");
+            this.currentAmount = Money.of(currentAmount, curr);
         }
         if (deadlineDate != null) {
             this.deadlineDate = deadlineDate;

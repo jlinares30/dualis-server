@@ -68,6 +68,18 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
 
     @Override
     @Transactional
+    public SavingsGoalResponse withdrawFromGoal(UUID goalId, com.dualis.api.modules.savingsgoal.dto.request.WithdrawGoalRequest request) {
+        SavingsGoal goal = savingsGoalRepository.findById(goalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+
+        goal.withdraw(request.getAmount());
+
+        SavingsGoal updated = savingsGoalRepository.save(goal);
+        return SavingsGoalResponse.fromDomain(updated);
+    }
+
+    @Override
+    @Transactional
     public SavingsGoalResponse updateGoal(UUID goalId, UpdateGoalRequest request) {
         SavingsGoal goal = savingsGoalRepository.findById(goalId)
                 .orElseThrow(() -> new ResourceNotFoundException(String.valueOf(goalId)));
@@ -75,6 +87,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
         goal.updateDetails(
                 request.getName(),
                 request.getTargetAmount(),
+                request.getCurrentAmount(),
                 request.getDeadlineDate(),
                 request.getCategory(),
                 request.getCurrency(),

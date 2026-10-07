@@ -56,6 +56,15 @@ public class SavingsGoalController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/{id}/withdraw")
+    @Operation(summary = "Withdraw funds from a savings goal")
+    public ResponseEntity<SavingsGoalResponse> withdrawFromGoal(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.dualis.api.modules.savingsgoal.dto.request.WithdrawGoalRequest request) {
+        SavingsGoalResponse updated = savingsGoalService.withdrawFromGoal(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a savings goal")
     public ResponseEntity<Void> deleteGoal(@PathVariable UUID id) {
