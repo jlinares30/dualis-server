@@ -1,0 +1,35 @@
+name: Wake Dualis Backend
+
+on:
+  repository_dispatch:
+    types: [wake-dualis]       
+  schedule:
+    - cron: '45 13 * * 1-6'     # respaldo: 8:45 hora Lima
+  workflow_dispatch:            # para ejecutarlo a mano desde la pestaña Actions
+
+jobs:
+  wake-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Wake Render Backend
+        shell: bash
+        run: |
+          URL="https://dualis-server.onrender.com/api/v1/health"
+
+          for attempt in 1 2 3 4 5; do
+            echo "Intento $attempt de despertar Dualis"
+            HTTP_CODE=$(curl -L -s -o /dev/null --max-time 120 -w "%{http_code}" "$URL") || true
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Dualis está activo"
+              exit 0
+            fi
+
+            echo "Respuesta HTTP: $HTTP_CODE"
+            sleep 15
+          done
+
+          echo "No se pudo despertar Dualis"
+          exit 1
