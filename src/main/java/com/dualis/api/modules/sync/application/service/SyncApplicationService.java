@@ -1,5 +1,6 @@
 package com.dualis.api.modules.sync.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
 import com.dualis.api.modules.account.dto.response.AccountResponse;
@@ -37,6 +38,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SyncApplicationService implements ManageSyncUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final AccountRepositoryPort accountRepository;
     private final TransactionRepositoryPort transactionRepository;
     private final SplitRuleRepositoryPort splitRuleRepository;
@@ -49,6 +51,7 @@ public class SyncApplicationService implements ManageSyncUseCase {
     @Transactional(readOnly = true)
     public SyncResponse pullDelta(SyncPullRequest request) {
         UUID workspaceId = request.getWorkspaceId();
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         OffsetDateTime lastSyncedAt = request.getLastSyncedAt();
         OffsetDateTime serverTimestamp = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -125,6 +128,7 @@ public class SyncApplicationService implements ManageSyncUseCase {
     @Override
     @Transactional
     public SyncResponse pushOfflineData(SyncPushRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         OffsetDateTime pushStart = OffsetDateTime.now(ZoneOffset.UTC);
 
         if (request.getOfflineTransactions() != null) {

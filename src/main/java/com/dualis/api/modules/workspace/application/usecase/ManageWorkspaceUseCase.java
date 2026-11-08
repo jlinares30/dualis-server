@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public interface ManageWorkspaceUseCase {
     WorkspaceResponse createWorkspace(CreateWorkspaceRequest request);
-    List<WorkspaceResponse> getWorkspacesByUserEmail(String userEmail);
+    List<WorkspaceResponse> getCurrentUserWorkspaces();
     WorkspaceResponse getWorkspaceById(UUID id);
     WorkspaceResponse updateWorkspace(UUID id, UpdateWorkspaceRequest request);
     void deleteWorkspace(UUID id);

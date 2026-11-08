@@ -1,5 +1,6 @@
 package com.dualis.api.modules.settlement.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.settlement.application.usecase.ManageSplitRuleUseCase;
 import com.dualis.api.modules.settlement.domain.model.SplitBreakdown;
@@ -24,11 +25,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final SplitRuleRepositoryPort splitRuleRepository;
 
     @Override
     @Transactional
     public SplitRuleResponse createSplitRule(CreateSplitRuleRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             unsetPreviousDefault(request.getWorkspaceId());
         }
@@ -61,6 +64,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<SplitRuleResponse> getSplitRulesByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return splitRuleRepository.findByWorkspaceId(workspaceId).stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -71,6 +75,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
     public SplitRuleResponse getSplitRuleById(UUID id) {
         SplitRule rule = splitRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Split rule not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(rule.getWorkspaceId());
         return mapToResponse(rule);
     }
 
@@ -79,6 +84,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
     public SplitRuleResponse updateSplitRule(UUID id, UpdateSplitRuleRequest request) {
         SplitRule rule = splitRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Split rule not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(rule.getWorkspaceId());
 
         if (Boolean.TRUE.equals(request.getIsDefault()) && !rule.isDefault()) {
             unsetPreviousDefault(rule.getWorkspaceId());
@@ -102,8 +108,9 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
     @Override
     @Transactional
     public void deleteSplitRule(UUID id) {
-        splitRuleRepository.findById(id)
+        SplitRule rule = splitRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Split rule not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(rule.getWorkspaceId());
         splitRuleRepository.delete(id);
     }
 
@@ -114,7 +121,9 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
         if (request.getSplitRuleId() != null) {
             rule = splitRuleRepository.findById(request.getSplitRuleId())
                     .orElseThrow(() -> new ResourceNotFoundException("Split rule not found with id: " + request.getSplitRuleId()));
+            workspaceAccess.assertCurrentUserIsMember(rule.getWorkspaceId());
         } else if (request.getWorkspaceId() != null) {
+            workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
             rule = splitRuleRepository.findDefaultByWorkspaceId(request.getWorkspaceId())
                     .orElseGet(() -> SplitRule.createDefaultEqualRule(request.getWorkspaceId()));
         } else {

@@ -1,5 +1,6 @@
 package com.dualis.api.modules.workspace.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
@@ -11,16 +12,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.dualis.api.exception.ForbiddenException;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -29,6 +35,9 @@ class WorkspaceApplicationServiceTest {
 
     @Mock
     private WorkspaceRepositoryPort workspaceRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private WorkspaceApplicationService workspaceApplicationService;
@@ -55,39 +64,112 @@ class WorkspaceApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("Should create workspace successfully")
-    void createWorkspace_Success() {
+    @DisplayName("Should create workspace owned by the authenticated user, ignoring ownerEmail from the body")
+    void createWorkspace_UsesAuthenticatedUserAsOwner() {
         CreateWorkspaceRequest request = CreateWorkspaceRequest.builder()
                 .name("Jorge & Maria")
                 .type(WorkspaceType.COUPLE)
                 .currency("USD")
-                .ownerEmail("jorge@example.com")
+                .ownerEmail("attacker@example.com")
                 .build();
 
-        when(workspaceRepository.save(any(Workspace.class))).thenReturn(workspace);
+        when(workspaceAccess.currentUserEmail()).thenReturn("jorge@example.com");
+        when(workspaceRepository.findByInvitationCode(anyString())).thenReturn(Optional.empty());
+        when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WorkspaceResponse response = workspaceApplicationService.createWorkspace(request);
 
-        assertThat(response).isNotNull();
-        assertThat(response.getName()).isEqualTo("Jorge & Maria");
-        verify(workspaceRepository, times(1)).save(any(Workspace.class));
+        assertThat(response.getOwnerEmail()).isEqualTo("jorge@example.com");
+        ArgumentCaptor<Workspace> captor = ArgumentCaptor.forClass(Workspace.class);
+        verify(workspaceRepository).save(captor.capture());
+        assertThat(captor.getValue().getMembers())
+                .extracting(m -> m.getUserEmail())
+                .containsExactly("jorge@example.com");
     }
 
     @Test
-    @DisplayName("Should join workspace successfully")
-    void joinWorkspace_Success() {
+    @DisplayName("Should list only the authenticated user's workspaces")
+    void getCurrentUserWorkspaces_UsesAuthenticatedUser() {
+        when(workspaceAccess.currentUserEmail()).thenReturn("jorge@example.com");
+        when(workspaceRepository.findWorkspacesByUserEmail("jorge@example.com")).thenReturn(List.of(workspace));
+
+        List<WorkspaceResponse> result = workspaceApplicationService.getCurrentUserWorkspaces();
+
+        assertThat(result).hasSize(1);
+        verify(workspaceRepository).findWorkspacesByUserEmail("jorge@example.com");
+    }
+
+    @Test
+    @DisplayName("Should join workspace as the authenticated user, ignoring partnerEmail from the body")
+    void joinWorkspace_UsesAuthenticatedUser() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
         JoinWorkspaceRequest request = JoinWorkspaceRequest.builder()
                 .invitationCode("DUAL8X")
-                .partnerEmail("maria@example.com")
+                .partnerEmail("someone-else@example.com")
                 .build();
 
+        when(workspaceAccess.currentUserEmail()).thenReturn("maria@example.com");
         when(workspaceRepository.findByInvitationCode("DUAL8X")).thenReturn(Optional.of(workspace));
         when(workspaceRepository.save(any(Workspace.class))).thenReturn(workspace);
 
         WorkspaceResponse response = workspaceApplicationService.joinWorkspace(request);
 
         assertThat(response).isNotNull();
-        verify(workspaceRepository, times(1)).findByInvitationCode("DUAL8X");
-        verify(workspaceRepository, times(1)).save(workspace);
+        assertThat(workspace.getMembers())
+                .extracting(m -> m.getUserEmail())
+                .containsExactlyInAnyOrder("jorge@example.com", "maria@example.com");
+    }
+
+    @Test
+    @DisplayName("Should reject reading a workspace the user does not belong to")
+    void getWorkspaceById_NotMember_Forbidden() {
+        doThrow(new ForbiddenException("denied")).when(workspaceAccess).assertCurrentUserIsMember(workspaceId);
+
+        assertThatThrownBy(() -> workspaceApplicationService.getWorkspaceById(workspaceId))
+                .isInstanceOf(ForbiddenException.class);
+        verify(workspaceRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Owner deleting the workspace deactivates it")
+    void deleteWorkspace_Owner_Deactivates() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(workspaceAccess.currentUserEmail()).thenReturn("jorge@example.com");
+
+        workspaceApplicationService.deleteWorkspace(workspaceId);
+
+        assertThat(workspace.isActive()).isFalse();
+        verify(workspaceRepository).save(workspace);
+        verify(workspaceRepository, never()).removeMember(any(), any());
+    }
+
+    @Test
+    @DisplayName("Partner deleting the workspace only leaves it; it stays active for the owner")
+    void deleteWorkspace_Partner_LeavesOnly() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
+        workspace.addMember("maria@example.com", WorkspaceRole.PARTNER);
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(workspaceAccess.currentUserEmail()).thenReturn("maria@example.com");
+
+        workspaceApplicationService.deleteWorkspace(workspaceId);
+
+        assertThat(workspace.isActive()).isTrue();
+        verify(workspaceRepository).removeMember(workspaceId, "maria@example.com");
+        verify(workspaceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Non-member cannot delete a workspace")
+    void deleteWorkspace_NonMember_Forbidden() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(workspaceAccess.currentUserEmail()).thenReturn("attacker@example.com");
+
+        assertThatThrownBy(() -> workspaceApplicationService.deleteWorkspace(workspaceId))
+                .isInstanceOf(ForbiddenException.class);
+        assertThat(workspace.isActive()).isTrue();
+        verify(workspaceRepository, never()).save(any());
+        verify(workspaceRepository, never()).removeMember(any(), any());
     }
 }

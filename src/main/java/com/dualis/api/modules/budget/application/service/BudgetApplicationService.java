@@ -1,5 +1,6 @@
 package com.dualis.api.modules.budget.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.budget.application.usecase.ManageBudgetUseCase;
 import com.dualis.api.modules.budget.domain.model.Budget;
@@ -29,12 +30,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BudgetApplicationService implements ManageBudgetUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final BudgetRepositoryPort budgetRepository;
     private final TransactionRepositoryPort transactionRepository;
 
     @Override
     @Transactional
     public BudgetResponse createBudget(CreateBudgetRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         List<Budget> existingList = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(
                 request.getWorkspaceId(), request.getPeriodMonth(), request.getPeriodYear()
         );
@@ -66,6 +69,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<BudgetProgressResponse> getBudgetsByWorkspaceAndPeriod(UUID workspaceId, Integer month, Integer year) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         List<Budget> list;
         if (month != null && year != null) {
             list = budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(workspaceId, month, year);
@@ -80,6 +84,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     public BudgetResponse getBudgetById(UUID id) {
         Budget budget = budgetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
         return BudgetResponse.fromDomain(budget);
     }
 
@@ -88,6 +93,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     public BudgetResponse updateBudget(UUID id, UpdateBudgetRequest request) {
         Budget budget = budgetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
 
         budget.updateDetails(
                 request.getName(),
@@ -107,6 +113,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     public BudgetProgressResponse getBudgetProgress(UUID budgetId) {
         Budget budget = budgetRepository.findById(budgetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + budgetId));
+        workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
 
         YearMonth ym = YearMonth.of(budget.getPeriodYear(), budget.getPeriodMonth());
         OffsetDateTime startDate = ym.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC);
@@ -164,8 +171,9 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     @Override
     @Transactional
     public void deleteBudget(UUID id) {
-        budgetRepository.findById(id)
+        Budget budget = budgetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
         budgetRepository.delete(id);
     }
 }

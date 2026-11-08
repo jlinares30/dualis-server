@@ -2,6 +2,8 @@ package com.dualis.api.modules.workspace.application.service;
 
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.workspace.application.usecase.ManageWorkspaceUseCase;
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
+import com.dualis.api.exception.ForbiddenException;
 import com.dualis.api.modules.workspace.domain.model.Workspace;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
@@ -26,12 +28,15 @@ import java.util.UUID;
 public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
     private final WorkspaceRepositoryPort workspaceRepository;
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private static final String ALPHA_NUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
     @Transactional
     public WorkspaceResponse createWorkspace(CreateWorkspaceRequest request) {
+        // The owner is always the authenticated user; any ownerEmail sent by the client is ignored.
+        String ownerEmail = workspaceAccess.currentUserEmail();
         String invitationCode = null;
         WorkspaceType domainType = request.getType() != null
                 ? request.getType()
@@ -46,7 +51,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
                 .description(request.getDescription())
                 .type(domainType)
                 .currency(request.getCurrency())
-                .ownerEmail(request.getOwnerEmail())
+                .ownerEmail(ownerEmail)
                 .invitationCode(invitationCode)
                 .isActive(true)
                 .members(new ArrayList<>())
@@ -54,7 +59,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
                 .updatedAt(OffsetDateTime.now())
                 .build();
 
-        workspace.addMember(request.getOwnerEmail(), WorkspaceRole.OWNER);
+        workspace.addMember(ownerEmail, WorkspaceRole.OWNER);
 
         Workspace saved = workspaceRepository.save(workspace);
         return WorkspaceResponse.fromDomain(saved);
@@ -62,14 +67,15 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<WorkspaceResponse> getWorkspacesByUserEmail(String userEmail) {
-        List<Workspace> workspaces = workspaceRepository.findWorkspacesByUserEmail(userEmail);
+    public List<WorkspaceResponse> getCurrentUserWorkspaces() {
+        List<Workspace> workspaces = workspaceRepository.findWorkspacesByUserEmail(workspaceAccess.currentUserEmail());
         return workspaces.stream().map(WorkspaceResponse::fromDomain).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public WorkspaceResponse getWorkspaceById(UUID id) {
+        workspaceAccess.assertCurrentUserIsMember(id);
         Workspace workspace = workspaceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + id));
         return WorkspaceResponse.fromDomain(workspace);
@@ -78,6 +84,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
     @Override
     @Transactional
     public WorkspaceResponse updateWorkspace(UUID id, UpdateWorkspaceRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(id);
         Workspace workspace = workspaceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + id));
 
@@ -91,13 +98,29 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
     public void deleteWorkspace(UUID id) {
         Workspace workspace = workspaceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + id));
-        workspace.deactivate();
-        workspaceRepository.save(workspace);
+        String email = workspaceAccess.currentUserEmail();
+
+        if (email.equalsIgnoreCase(workspace.getOwnerEmail())) {
+            // Only the owner can deactivate the workspace for everyone.
+            workspace.deactivate();
+            workspaceRepository.save(workspace);
+            return;
+        }
+
+        boolean isMember = workspace.getMembers() != null && workspace.getMembers().stream()
+                .anyMatch(m -> m.getUserEmail() != null && m.getUserEmail().equalsIgnoreCase(email));
+        if (!isMember) {
+            throw new ForbiddenException("You do not have access to this workspace");
+        }
+
+        // A partner "deleting" the workspace only leaves it; it stays active for the owner.
+        workspaceRepository.removeMember(id, email);
     }
 
     @Override
     @Transactional
     public WorkspaceResponse invitePartner(UUID workspaceId, InvitePartnerRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + workspaceId));
 
@@ -116,6 +139,8 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
     @Override
     @Transactional
     public WorkspaceResponse joinWorkspace(JoinWorkspaceRequest request) {
+        // The joining user is always the authenticated user; any partnerEmail sent by the client is ignored.
+        String partnerEmail = workspaceAccess.currentUserEmail();
         Workspace workspace = workspaceRepository.findByInvitationCode(request.getInvitationCode().trim().toUpperCase())
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid or expired invitation code: " + request.getInvitationCode()));
 
@@ -124,12 +149,12 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
         }
 
         boolean alreadyMember = workspace.getMembers().stream()
-                .anyMatch(m -> m.getUserEmail().equalsIgnoreCase(request.getPartnerEmail()));
+                .anyMatch(m -> m.getUserEmail().equalsIgnoreCase(partnerEmail));
         if (alreadyMember) {
-            throw new IllegalArgumentException("User " + request.getPartnerEmail() + " is already a member of this workspace");
+            throw new IllegalArgumentException("User " + partnerEmail + " is already a member of this workspace");
         }
 
-        workspace.addMember(request.getPartnerEmail(), WorkspaceRole.PARTNER);
+        workspace.addMember(partnerEmail, WorkspaceRole.PARTNER);
         Workspace updated = workspaceRepository.save(workspace);
         return WorkspaceResponse.fromDomain(updated);
     }

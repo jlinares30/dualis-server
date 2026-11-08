@@ -1,5 +1,6 @@
 package com.dualis.api.modules.subscription.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.subscription.application.usecase.ManageSubscriptionUseCase;
 import com.dualis.api.modules.subscription.domain.model.SalaryDistributionBranch;
@@ -27,12 +28,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SubscriptionApplicationService implements ManageSubscriptionUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final SubscriptionRepositoryPort subscriptionRepository;
     private final SalaryDistributionConfigRepositoryPort salaryDistributionConfigRepository;
 
     @Override
     @Transactional
     public SubscriptionResponse createSubscription(CreateSubscriptionRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         String currency = request.getCurrency() != null ? request.getCurrency() : "PEN";
 
         Subscription sub = Subscription.builder()
@@ -54,6 +57,7 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
     @Override
     @Transactional(readOnly = true)
     public List<SubscriptionResponse> getSubscriptionsByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return subscriptionRepository.findByWorkspaceId(workspaceId).stream()
                 .map(SubscriptionResponse::fromDomain)
                 .toList();
@@ -64,6 +68,7 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
     public SubscriptionResponse togglePaidStatus(UUID subscriptionId) {
         Subscription sub = subscriptionRepository.findById(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + subscriptionId));
+        workspaceAccess.assertCurrentUserIsMember(sub.getWorkspaceId());
 
         sub.togglePaidStatus();
 
@@ -74,21 +79,27 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
     @Override
     @Transactional
     public void deleteSubscription(UUID subscriptionId) {
-        if (!subscriptionRepository.existsById(subscriptionId)) {
-            throw new ResourceNotFoundException("Subscription not found with id: " + subscriptionId);
-        }
+        Subscription sub = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + subscriptionId));
+        workspaceAccess.assertCurrentUserIsMember(sub.getWorkspaceId());
         subscriptionRepository.delete(subscriptionId);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SalaryDistributionConfigResponse getSalaryDistributionConfig(UUID workspaceId, String userEmail) {
-        Optional<SalaryDistributionConfig> configOpt = (userEmail != null && !userEmail.isBlank())
-                ? salaryDistributionConfigRepository.findByWorkspaceIdAndUserEmail(workspaceId, userEmail)
-                : salaryDistributionConfigRepository.findByWorkspaceId(workspaceId);
+    public SalaryDistributionConfigResponse getSalaryDistributionConfig(UUID workspaceId, String requestedUserEmail) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
+        // A user can only read their own salary configuration; the requested email is ignored.
+        String userEmail = workspaceAccess.currentUserEmail();
 
-        if (configOpt.isEmpty() && userEmail != null && !userEmail.isBlank()) {
-            configOpt = salaryDistributionConfigRepository.findByWorkspaceId(workspaceId);
+        Optional<SalaryDistributionConfig> configOpt =
+                salaryDistributionConfigRepository.findByWorkspaceIdAndUserEmail(workspaceId, userEmail);
+
+        if (configOpt.isEmpty()) {
+            // Legacy configs saved without an owner are still returned, but never another member's config.
+            configOpt = salaryDistributionConfigRepository.findByWorkspaceId(workspaceId)
+                    .filter(c -> c.getUserEmail() == null || c.getUserEmail().isBlank()
+                            || c.getUserEmail().equalsIgnoreCase(userEmail));
         }
 
         return configOpt.map(this::toResponse).orElseGet(() -> SalaryDistributionConfigResponse.builder()
@@ -106,6 +117,9 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
     @Override
     @Transactional
     public SalaryDistributionConfigResponse saveSalaryDistributionConfig(SaveSalaryDistributionConfigRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
+        // The configuration always belongs to the authenticated user.
+        request.setUserEmail(workspaceAccess.currentUserEmail());
         List<SalaryDistributionBranch> domainBranches = new ArrayList<>();
         if (request.getBranches() != null) {
             domainBranches = request.getBranches().stream()
@@ -125,9 +139,8 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
                     .toList();
         }
 
-        Optional<SalaryDistributionConfig> existingOpt = (request.getUserEmail() != null && !request.getUserEmail().isBlank())
-                ? salaryDistributionConfigRepository.findByWorkspaceIdAndUserEmail(request.getWorkspaceId(), request.getUserEmail())
-                : salaryDistributionConfigRepository.findByWorkspaceId(request.getWorkspaceId());
+        Optional<SalaryDistributionConfig> existingOpt =
+                salaryDistributionConfigRepository.findByWorkspaceIdAndUserEmail(request.getWorkspaceId(), request.getUserEmail());
 
         SalaryDistributionConfig toSave;
         if (existingOpt.isPresent()) {

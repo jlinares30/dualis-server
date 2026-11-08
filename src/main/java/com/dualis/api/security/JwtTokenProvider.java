@@ -17,9 +17,20 @@ public class JwtTokenProvider {
     private final SecretKey key;
     private final long expirationInMs;
 
+    private static final int MIN_SECRET_BYTES = 32;
+
     public JwtTokenProvider(
-            @Value("${app.jwt.secret:DualisSecureSecretKeyForJWTTokenGeneration20261234567890}") String jwtSecret,
-            @Value("${app.jwt.expiration-ms:86400000}") long expirationInMs) {
+            @Value("${app.jwt.secret:}") String jwtSecret,
+            @Value("${app.jwt.expiration-ms:7200000}") long expirationInMs) {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_JWT_SECRET is not configured. Set a random secret of at least "
+                            + MIN_SECRET_BYTES + " bytes (e.g. `openssl rand -base64 48`).");
+        }
+        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "APP_JWT_SECRET is too short: it must be at least " + MIN_SECRET_BYTES + " bytes.");
+        }
         this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.expirationInMs = expirationInMs;
     }

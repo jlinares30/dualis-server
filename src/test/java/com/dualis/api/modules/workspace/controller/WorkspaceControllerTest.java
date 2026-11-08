@@ -99,11 +99,10 @@ class WorkspaceControllerTest {
     @Test
     @DisplayName("GET /api/v1/workspaces - Should return list of user workspaces")
     void getWorkspacesByUserEmail_ShouldReturnList() throws Exception {
-        when(workspaceService.getWorkspacesByUserEmail(eq("jorge@example.com")))
+        when(workspaceService.getCurrentUserWorkspaces())
                 .thenReturn(List.of(workspaceResponse));
 
-        mockMvc.perform(get("/api/v1/workspaces")
-                        .param("userEmail", "jorge@example.com"))
+        mockMvc.perform(get("/api/v1/workspaces"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].ownerEmail").value("jorge@example.com"));

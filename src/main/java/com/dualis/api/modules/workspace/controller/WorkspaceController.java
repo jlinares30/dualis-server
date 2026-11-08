@@ -47,16 +47,16 @@ public class WorkspaceController {
     }
 
     @GetMapping
-    @Operation(summary = "List user workspaces", description = "Retrieves all workspaces where the specified user is an owner or partner member")
+    @Operation(summary = "List user workspaces", description = "Retrieves all workspaces where the authenticated user is an owner or partner member")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Workspaces retrieved successfully"),
-            @ApiResponse(responseCode = "400", description = "Missing userEmail parameter",
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<List<WorkspaceResponse>> getWorkspacesByUserEmail(
-            @Parameter(description = "User email address", required = true, example = "jorge@example.com")
-            @RequestParam String userEmail) {
-        List<WorkspaceResponse> workspaces = workspaceService.getWorkspacesByUserEmail(userEmail);
+            @Parameter(description = "Deprecated and ignored: the authenticated user is always used", deprecated = true)
+            @RequestParam(required = false) String userEmail) {
+        List<WorkspaceResponse> workspaces = workspaceService.getCurrentUserWorkspaces();
         return ResponseEntity.ok(workspaces);
     }
 

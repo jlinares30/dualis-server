@@ -1,5 +1,6 @@
 package com.dualis.api.modules.sync.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
 import com.dualis.api.modules.account.domain.model.AccountType;
@@ -58,6 +59,9 @@ class SyncApplicationServiceTest {
 
     @Mock
     private ManageTransactionUseCase transactionUseCase;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private SyncApplicationService syncService;

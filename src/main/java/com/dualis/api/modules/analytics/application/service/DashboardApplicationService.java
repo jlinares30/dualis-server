@@ -1,5 +1,6 @@
 package com.dualis.api.modules.analytics.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
 import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DashboardApplicationService implements GetDashboardSummaryUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final AccountRepositoryPort accountRepository;
     private final TransactionRepositoryPort transactionRepository;
     private final CategoryRepositoryPort categoryRepository;
@@ -41,6 +43,7 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase {
     @Override
     @Transactional(readOnly = true)
     public DashboardSummaryResponse getDashboardSummary(UUID workspaceId, Integer month, Integer year) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         int periodMonth = (month != null) ? month : now.getMonthValue();
         int periodYear = (year != null) ? year : now.getYear();

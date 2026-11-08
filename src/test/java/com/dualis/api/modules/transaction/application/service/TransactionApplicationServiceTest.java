@@ -1,5 +1,10 @@
 package com.dualis.api.modules.transaction.application.service;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.dualis.api.exception.ForbiddenException;
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
 import com.dualis.api.modules.account.domain.model.AccountType;
@@ -40,6 +45,9 @@ class TransactionApplicationServiceTest {
 
     @Mock
     private WorkspaceRepositoryPort workspaceRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private TransactionApplicationService transactionApplicationService;
@@ -150,5 +158,56 @@ class TransactionApplicationServiceTest {
         assertThat(targetAccount.getBalance().amount()).isEqualTo(new BigDecimal("300.00"));
         verify(accountRepository, times(1)).save(primaryAccount);
         verify(accountRepository, times(1)).save(targetAccount);
+    }
+
+    @Test
+    @DisplayName("Should reject using an account from a workspace the user does not belong to")
+    void createTransaction_ForeignAccount_Forbidden() {
+        UUID foreignWorkspaceId = UUID.randomUUID();
+        Account foreignAccount = Account.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(foreignWorkspaceId)
+                .name("Partner Personal Account")
+                .type(AccountType.BANK)
+                .balance(Money.of(new BigDecimal("900.00"), "USD"))
+                .status(AccountStatus.ACTIVE)
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        CreateTransactionRequest request = CreateTransactionRequest.builder()
+                .workspaceId(workspaceId)
+                .accountId(foreignAccount.getId())
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("50.00"))
+                .currency("USD")
+                .build();
+
+        when(accountRepository.findById(foreignAccount.getId())).thenReturn(Optional.of(foreignAccount));
+        when(workspaceAccess.currentUserEmail()).thenReturn("maria@example.com");
+        when(workspaceAccess.isMember(foreignWorkspaceId, "maria@example.com")).thenReturn(false);
+
+        assertThatThrownBy(() -> transactionApplicationService.createTransaction(request))
+                .isInstanceOf(ForbiddenException.class);
+        assertThat(foreignAccount.getBalance().amount()).isEqualByComparingTo("900.00");
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should not reveal a transaction from a workspace the user does not belong to")
+    void getTransactionById_NotMember_Forbidden() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = Transaction.builder()
+                .id(txId)
+                .workspaceId(workspaceId)
+                .accountId(primaryAccountId)
+                .type(TransactionType.EXPENSE)
+                .amount(Money.of(new BigDecimal("10.00"), "USD"))
+                .createdAt(OffsetDateTime.now())
+                .build();
+        when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+        doThrow(new ForbiddenException("denied")).when(workspaceAccess).assertCurrentUserIsMember(workspaceId);
+
+        assertThatThrownBy(() -> transactionApplicationService.getTransactionById(txId))
+                .isInstanceOf(ForbiddenException.class);
     }
 }

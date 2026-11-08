@@ -1,5 +1,6 @@
 package com.dualis.api.modules.account.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.account.application.usecase.ManageAccountUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
@@ -22,11 +23,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountApplicationService implements ManageAccountUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final AccountRepositoryPort accountRepository;
 
     @Override
     @Transactional
     public AccountResponse createAccount(CreateAccountRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         Money balance = Money.of(
                 request.getBalance(),
                 request.getCurrency() != null ? request.getCurrency() : Money.DEFAULT_CURRENCY
@@ -53,6 +56,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     public AccountResponse updateAccount(UUID id, UpdateAccountRequest request) {
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(account.getWorkspaceId());
 
         account.updateDetails(
                 request.getName(),
@@ -69,6 +73,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByWorkspace(UUID workspaceId, AccountStatus status) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         List<Account> accounts;
         if (status != null) {
             accounts = accountRepository.findByWorkspaceIdAndStatus(workspaceId, status);
@@ -83,6 +88,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     public AccountResponse getAccountById(UUID id) {
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(account.getWorkspaceId());
         return AccountResponse.fromDomain(account);
     }
 
@@ -91,6 +97,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     public void archiveAccount(UUID id) {
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(account.getWorkspaceId());
         account.archive();
         accountRepository.save(account);
     }
