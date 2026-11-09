@@ -27,7 +27,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/dualis_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: secretpassword
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       APP_JWT_SECRET: local-dev-only-secret-change-me-0123456789abcdef
     depends_on:
       postgres-db:
