@@ -32,6 +32,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
     @Transactional
     public SplitRuleResponse createSplitRule(CreateSplitRuleRequest request) {
         workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
+        boolean callerIsA = workspaceAccess.isCurrentUserOwner(request.getWorkspaceId());
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             unsetPreviousDefault(request.getWorkspaceId());
         }
@@ -46,8 +47,11 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
                 .splitType(domainSplitType)
                 .partnerAPercentage(request.getPartnerAPercentage())
                 .partnerBPercentage(request.getPartnerBPercentage())
-                .partnerAIncome(request.getPartnerAIncome())
-                .partnerBIncome(request.getPartnerBIncome())
+                // Each partner can only register their own income
+                .partnerAIncome(callerIsA ? request.getPartnerAIncome() : null)
+                .partnerBIncome(callerIsA ? null : request.getPartnerBIncome())
+                .partnerAIncomeHidden(callerIsA && Boolean.TRUE.equals(request.getPartnerAIncomeHidden()))
+                .partnerBIncomeHidden(!callerIsA && Boolean.TRUE.equals(request.getPartnerBIncomeHidden()))
                 .partnerAFixedAmount(request.getPartnerAFixedAmount())
                 .isDefault(Boolean.TRUE.equals(request.getIsDefault()))
                 .createdAt(OffsetDateTime.now())
@@ -58,15 +62,16 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
         rule.recalculatePercentagesIfNeeded();
 
         SplitRule saved = splitRuleRepository.save(rule);
-        return mapToResponse(saved);
+        return SplitRuleResponse.forViewer(saved, callerIsA);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SplitRuleResponse> getSplitRulesByWorkspace(UUID workspaceId) {
         workspaceAccess.assertCurrentUserIsMember(workspaceId);
+        boolean viewerIsA = workspaceAccess.isCurrentUserOwner(workspaceId);
         return splitRuleRepository.findByWorkspaceId(workspaceId).stream()
-                .map(this::mapToResponse)
+                .map(rule -> SplitRuleResponse.forViewer(rule, viewerIsA))
                 .toList();
     }
 
@@ -76,7 +81,7 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
         SplitRule rule = splitRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Split rule not found with id: " + id));
         workspaceAccess.assertCurrentUserIsMember(rule.getWorkspaceId());
-        return mapToResponse(rule);
+        return SplitRuleResponse.forViewer(rule, workspaceAccess.isCurrentUserOwner(rule.getWorkspaceId()));
     }
 
     @Override
@@ -90,19 +95,27 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
             unsetPreviousDefault(rule.getWorkspaceId());
         }
 
+        boolean callerIsA = workspaceAccess.isCurrentUserOwner(rule.getWorkspaceId());
+
+        // Each partner can only change their own income and privacy flag; values sent for the
+        // other partner are ignored (they may be hidden/null on the client).
         rule.update(
                 request.getName(),
                 request.getSplitType(),
                 request.getPartnerAPercentage(),
                 request.getPartnerBPercentage(),
-                request.getPartnerAIncome(),
-                request.getPartnerBIncome(),
+                callerIsA ? request.getPartnerAIncome() : null,
+                callerIsA ? null : request.getPartnerBIncome(),
                 request.getPartnerAFixedAmount(),
                 request.getIsDefault()
         );
+        Boolean ownHidden = callerIsA ? request.getPartnerAIncomeHidden() : request.getPartnerBIncomeHidden();
+        if (ownHidden != null) {
+            rule.setIncomeHidden(callerIsA, ownHidden);
+        }
 
         SplitRule updated = splitRuleRepository.save(rule);
-        return mapToResponse(updated);
+        return SplitRuleResponse.forViewer(updated, callerIsA);
     }
 
     @Override
@@ -152,22 +165,5 @@ public class SplitRuleApplicationService implements ManageSplitRuleUseCase {
                     existing.update(null, null, null, null, null, null, null, false);
                     splitRuleRepository.save(existing);
                 });
-    }
-
-    private SplitRuleResponse mapToResponse(SplitRule rule) {
-        return SplitRuleResponse.builder()
-                .id(rule.getId())
-                .workspaceId(rule.getWorkspaceId())
-                .name(rule.getName())
-                .splitType(rule.getSplitType())
-                .partnerAPercentage(rule.getPartnerAPercentage())
-                .partnerBPercentage(rule.getPartnerBPercentage())
-                .partnerAIncome(rule.getPartnerAIncome())
-                .partnerBIncome(rule.getPartnerBIncome())
-                .partnerAFixedAmount(rule.getPartnerAFixedAmount())
-                .isDefault(rule.isDefault())
-                .createdAt(rule.getCreatedAt())
-                .updatedAt(rule.getUpdatedAt())
-                .build();
     }
 }

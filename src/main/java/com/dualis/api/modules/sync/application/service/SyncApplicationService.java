@@ -80,7 +80,11 @@ public class SyncApplicationService implements ManageSyncUseCase {
                     .filter(sr -> sr.getUpdatedAt() != null && sr.getUpdatedAt().isAfter(lastSyncedAt))
                     .toList();
         }
-        List<SplitRuleResponse> splitRuleResponses = splitRules.stream().map(SplitRuleResponse::fromEntity).toList();
+        // Respect each partner's income privacy, exactly like the split rules endpoint.
+        boolean viewerIsPartnerA = workspaceAccess.isCurrentUserOwner(workspaceId);
+        List<SplitRuleResponse> splitRuleResponses = splitRules.stream()
+                .map(rule -> SplitRuleResponse.forViewer(rule, viewerIsPartnerA))
+                .toList();
 
         // 4. Delta Budgets
         List<Budget> budgets = budgetRepository.findByWorkspaceId(workspaceId);

@@ -180,8 +180,8 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
 
         Settlement settlement = Settlement.builder()
                 .workspaceId(request.getWorkspaceId())
-                .payerEmail(request.getPayerEmail())
-                .recipientEmail(request.getRecipientEmail())
+                .payerEmail(request.getPayerEmail().trim().toLowerCase())
+                .recipientEmail(request.getRecipientEmail().trim().toLowerCase())
                 .amount(amount)
                 .status(SettlementStatus.PENDING)
                 .note(request.getNote())

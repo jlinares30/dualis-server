@@ -45,4 +45,10 @@ public class UpdateSplitRuleRequest {
 
     @Schema(description = "Set as default for workspace", example = "true")
     private Boolean isDefault;
+
+    /** Hide partner A's exact income from partner B. Only applied when sent by partner A (owner). */
+    private Boolean partnerAIncomeHidden;
+
+    /** Hide partner B's exact income from partner A. Only applied when sent by partner B. */
+    private Boolean partnerBIncomeHidden;
 }

@@ -43,6 +43,12 @@ public class SplitRuleJpaEntity {
     @Column(name = "partner_b_income", precision = 15, scale = 2)
     private BigDecimal partnerBIncome;
 
+    @Column(name = "partner_a_income_hidden", nullable = false)
+    private boolean partnerAIncomeHidden;
+
+    @Column(name = "partner_b_income_hidden", nullable = false)
+    private boolean partnerBIncomeHidden;
+
     @Column(name = "partner_a_fixed_amount", precision = 15, scale = 2)
     private BigDecimal partnerAFixedAmount;
 

@@ -21,6 +21,10 @@ public class SplitRule {
     private BigDecimal partnerBPercentage;
     private BigDecimal partnerAIncome;
     private BigDecimal partnerBIncome;
+    /** When true, partner A's exact income is never returned to partner B (only the resulting %). */
+    private boolean partnerAIncomeHidden;
+    /** When true, partner B's exact income is never returned to partner A (only the resulting %). */
+    private boolean partnerBIncomeHidden;
     private BigDecimal partnerAFixedAmount;
     private boolean isDefault;
     private final OffsetDateTime createdAt;
@@ -67,8 +71,9 @@ public class SplitRule {
                 throw new IllegalArgumentException("Partner percentages must sum to 100%");
             }
         } else if (splitType == SplitType.PROPORTIONAL) {
-            if (partnerAIncome == null || partnerBIncome == null) {
-                throw new IllegalArgumentException("Partner A and Partner B net incomes are required for PROPORTIONAL split");
+            // Each partner registers only their own income, so one of them may still be missing.
+            if ((partnerAIncome != null && partnerAIncome.signum() < 0) || (partnerBIncome != null && partnerBIncome.signum() < 0)) {
+                throw new IllegalArgumentException("Partner incomes cannot be negative");
             }
         } else if (splitType == SplitType.FIXED_AMOUNT) {
             if (partnerAFixedAmount == null) {
@@ -81,14 +86,26 @@ public class SplitRule {
         if (splitType == SplitType.EQUAL) {
             this.partnerAPercentage = new BigDecimal("50.00");
             this.partnerBPercentage = new BigDecimal("50.00");
-        } else if (splitType == SplitType.PROPORTIONAL && partnerAIncome != null && partnerBIncome != null) {
-            BigDecimal totalIncome = partnerAIncome.add(partnerBIncome);
+        } else if (splitType == SplitType.PROPORTIONAL && (partnerAIncome != null || partnerBIncome != null)) {
+            BigDecimal incomeA = partnerAIncome != null ? partnerAIncome : BigDecimal.ZERO;
+            BigDecimal incomeB = partnerBIncome != null ? partnerBIncome : BigDecimal.ZERO;
+            BigDecimal totalIncome = incomeA.add(incomeB);
             if (totalIncome.compareTo(BigDecimal.ZERO) > 0) {
-                this.partnerAPercentage = partnerAIncome.multiply(new BigDecimal("100"))
+                this.partnerAPercentage = incomeA.multiply(new BigDecimal("100"))
                         .divide(totalIncome, 2, RoundingMode.HALF_UP);
                 this.partnerBPercentage = new BigDecimal("100.00").subtract(this.partnerAPercentage);
             }
         }
+    }
+
+    /** Updates the income visibility flag of one partner (each partner controls only their own). */
+    public void setIncomeHidden(boolean partnerA, boolean hidden) {
+        if (partnerA) {
+            this.partnerAIncomeHidden = hidden;
+        } else {
+            this.partnerBIncomeHidden = hidden;
+        }
+        this.updatedAt = OffsetDateTime.now();
     }
 
     public SplitBreakdown calculateSplit(Money totalExpense, String paidBy) {

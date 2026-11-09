@@ -41,6 +41,10 @@ public class SplitRuleResponse {
     @Schema(description = "Partner B Income", example = "2000.00")
     private BigDecimal partnerBIncome;
 
+    private Boolean partnerAIncomeHidden;
+
+    private Boolean partnerBIncomeHidden;
+
     @Schema(description = "Partner A Fixed Amount", example = "500.00")
     private BigDecimal partnerAFixedAmount;
 
@@ -63,10 +67,28 @@ public class SplitRuleResponse {
                 .partnerBPercentage(rule.getPartnerBPercentage())
                 .partnerAIncome(rule.getPartnerAIncome())
                 .partnerBIncome(rule.getPartnerBIncome())
+                .partnerAIncomeHidden(rule.isPartnerAIncomeHidden())
+                .partnerBIncomeHidden(rule.isPartnerBIncomeHidden())
                 .partnerAFixedAmount(rule.getPartnerAFixedAmount())
                 .isDefault(rule.isDefault())
                 .createdAt(rule.getCreatedAt())
                 .updatedAt(rule.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Response for a given viewer: the other partner's exact income is removed when they chose to
+     * keep it private. Percentages are kept, since they are needed to split expenses.
+     */
+    public static SplitRuleResponse forViewer(SplitRule rule, boolean viewerIsPartnerA) {
+        SplitRuleResponse response = fromEntity(rule);
+        if (response == null) return null;
+        if (rule.isPartnerAIncomeHidden() && !viewerIsPartnerA) {
+            response.setPartnerAIncome(null);
+        }
+        if (rule.isPartnerBIncomeHidden() && viewerIsPartnerA) {
+            response.setPartnerBIncome(null);
+        }
+        return response;
     }
 }
