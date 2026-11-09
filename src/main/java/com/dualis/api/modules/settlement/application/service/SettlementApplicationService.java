@@ -30,6 +30,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,6 +53,9 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + workspaceId));
 
+        // All figures are expressed in the workspace currency (multi-currency conversion is handled separately).
+        String currency = workspace.getCurrency() != null ? workspace.getCurrency() : Money.DEFAULT_CURRENCY;
+
         String partnerAEmail = workspace.getOwnerEmail();
         String partnerBEmail = workspace.getMembers().stream()
                 .filter(m -> m.getRole() == WorkspaceRole.PARTNER)
@@ -62,116 +67,101 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
                 workspaceId, null, TransactionType.EXPENSE, null, null, null, null
         );
 
-        BigDecimal totalExpensesVal = expenses.stream()
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        Money totalExpenses = Money.of(totalExpensesVal);
+        // Fallback only for expenses saved before per-expense percentages existed.
+        BigDecimal fallbackPercentageA = splitRuleRepository.findDefaultByWorkspaceId(workspaceId)
+                .map(SplitRule::getPartnerAPercentage)
+                .orElse(new BigDecimal("50.00"));
 
-        Optional<SplitRule> splitRuleOpt = splitRuleRepository.findDefaultByWorkspaceId(workspaceId);
-        BigDecimal partnerAPercentage = new BigDecimal("50.00");
-        BigDecimal partnerBPercentage = new BigDecimal("50.00");
-
-        if (splitRuleOpt.isPresent()) {
-            SplitRule rule = splitRuleOpt.get();
-            if (rule.getPartnerAPercentage() != null && rule.getPartnerBPercentage() != null) {
-                partnerAPercentage = rule.getPartnerAPercentage();
-                partnerBPercentage = rule.getPartnerBPercentage();
-            }
-        }
-
-        // 1. Calculate each partner's agreed share
-        Money partnerAShare = totalExpenses.percentage(partnerAPercentage);
-        Money partnerBShare = totalExpenses.percentage(partnerBPercentage);
-
-        // 2. Calculate who actually paid each expense
-        BigDecimal partnerAPaidAcc = BigDecimal.ZERO;
-        BigDecimal partnerBPaidAcc = BigDecimal.ZERO;
+        Map<UUID, String> accountOwnerCache = new HashMap<>();
+        BigDecimal totalExpensesVal = BigDecimal.ZERO;
+        BigDecimal partnerAShareVal = BigDecimal.ZERO;
+        BigDecimal partnerAPaidVal = BigDecimal.ZERO;
+        BigDecimal partnerBPaidVal = BigDecimal.ZERO;
 
         for (Transaction expense : expenses) {
-            BigDecimal expenseAmount = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
-            if (expense.getAccountId() != null) {
-                Optional<Account> accOpt = accountRepository.findById(expense.getAccountId());
-                if (accOpt.isPresent()) {
-                    Account acc = accOpt.get();
-                    Optional<Workspace> accWsOpt = workspaceRepository.findById(acc.getWorkspaceId());
-                    if (accWsOpt.isPresent()) {
-                        String accOwner = accWsOpt.get().getOwnerEmail();
-                        if (accOwner != null && accOwner.equalsIgnoreCase(partnerBEmail)) {
-                            partnerBPaidAcc = partnerBPaidAcc.add(expenseAmount);
-                            continue;
-                        }
-                    }
-                }
+            BigDecimal amount = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
+            BigDecimal pctA = expense.getSplitPartnerAPercentage() != null
+                    ? expense.getSplitPartnerAPercentage()
+                    : fallbackPercentageA;
+
+            totalExpensesVal = totalExpensesVal.add(amount);
+            partnerAShareVal = partnerAShareVal.add(
+                    amount.multiply(pctA).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+
+            String payer = expense.getAccountId() != null
+                    ? accountOwnerCache.computeIfAbsent(expense.getAccountId(), this::resolveAccountOwnerEmail)
+                    : null;
+            if (payer != null && payer.equalsIgnoreCase(partnerBEmail)) {
+                partnerBPaidVal = partnerBPaidVal.add(amount);
+            } else {
+                // Shared accounts and A's accounts count as paid by partner A (owner)
+                partnerAPaidVal = partnerAPaidVal.add(amount);
             }
-            // Default to partner A (owner) if account belongs to A or is couple workspace owned by A
-            partnerAPaidAcc = partnerAPaidAcc.add(expenseAmount);
         }
 
-        Money partnerAPaid = Money.of(partnerAPaidAcc);
-        Money partnerBPaid = Money.of(partnerBPaidAcc);
+        BigDecimal partnerBShareVal = totalExpensesVal.subtract(partnerAShareVal);
 
-        List<Settlement> completedSettlements = settlementRepository.findByWorkspaceIdAndStatus(workspaceId, SettlementStatus.COMPLETED);
-        Money totalSettled = completedSettlements.stream()
-                .map(Settlement::getAmount)
-                .reduce(Money.zero(), Money::add);
+        // Positive net => B owes A. Negative net => A owes B.
+        BigDecimal netA = partnerAPaidVal.subtract(partnerAShareVal);
 
-        Money partnerANet = partnerAPaid.subtract(partnerAShare);
+        // Completed settlements move the balance in the direction of the payment:
+        // money paid by A to B increases A's position; money paid by B to A decreases it.
+        BigDecimal totalSettledVal = BigDecimal.ZERO;
+        for (Settlement s : settlementRepository.findByWorkspaceIdAndStatus(workspaceId, SettlementStatus.COMPLETED)) {
+            BigDecimal amt = s.getAmount() != null ? s.getAmount().amount() : BigDecimal.ZERO;
+            totalSettledVal = totalSettledVal.add(amt);
+            if (s.getPayerEmail() != null && s.getPayerEmail().equalsIgnoreCase(partnerAEmail)) {
+                netA = netA.add(amt);
+            } else if (s.getPayerEmail() != null && s.getPayerEmail().equalsIgnoreCase(partnerBEmail)) {
+                netA = netA.subtract(amt);
+            }
+        }
 
-        Money netBalance;
-        String debtor;
-        String creditor;
+        String debtor = null;
+        String creditor = null;
         String summaryText;
-
-        if (partnerANet.amount().compareTo(BigDecimal.ZERO) >= 0) {
-            netBalance = partnerANet.subtract(totalSettled);
-            if (netBalance.amount().compareTo(BigDecimal.ZERO) < 0) {
-                netBalance = netBalance.abs();
-                debtor = partnerAEmail;
-                creditor = partnerBEmail;
-                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
-            } else if (netBalance.amount().compareTo(BigDecimal.ZERO) == 0) {
-                debtor = null;
-                creditor = null;
-                summaryText = "All settled up! No outstanding balances.";
-            } else {
-                debtor = partnerBEmail;
-                creditor = partnerAEmail;
-                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
-            }
+        int sign = netA.compareTo(BigDecimal.ZERO);
+        BigDecimal netBalance = netA.abs().setScale(2, RoundingMode.HALF_UP);
+        if (sign > 0) {
+            debtor = partnerBEmail;
+            creditor = partnerAEmail;
+            summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance, currency);
+        } else if (sign < 0) {
+            debtor = partnerAEmail;
+            creditor = partnerBEmail;
+            summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance, currency);
         } else {
-            Money absNet = partnerANet.abs();
-            netBalance = absNet.subtract(totalSettled);
-            if (netBalance.amount().compareTo(BigDecimal.ZERO) < 0) {
-                netBalance = netBalance.abs();
-                debtor = partnerBEmail;
-                creditor = partnerAEmail;
-                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
-            } else if (netBalance.amount().compareTo(BigDecimal.ZERO) == 0) {
-                debtor = null;
-                creditor = null;
-                summaryText = "All settled up! No outstanding balances.";
-            } else {
-                debtor = partnerAEmail;
-                creditor = partnerBEmail;
-                summaryText = String.format("%s owes %s %s %s", debtor, creditor, netBalance.amount(), netBalance.currency());
-            }
+            summaryText = "All settled up! No outstanding balances.";
         }
 
         return DebtBalanceSummaryResponse.builder()
                 .workspaceId(workspaceId)
-                .totalSharedExpenses(totalExpenses.amount())
+                .currency(currency)
+                .totalSharedExpenses(scale(totalExpensesVal))
                 .partnerAEmail(partnerAEmail)
-                .partnerAShareTotal(partnerAShare.amount())
-                .partnerAPaidTotal(partnerAPaid.amount())
+                .partnerAShareTotal(scale(partnerAShareVal))
+                .partnerAPaidTotal(scale(partnerAPaidVal))
                 .partnerBEmail(partnerBEmail)
-                .partnerBShareTotal(partnerBShare.amount())
-                .partnerBPaidTotal(partnerBPaid.amount())
-                .totalSettledAmount(totalSettled.amount())
-                .netBalance(netBalance.amount())
+                .partnerBShareTotal(scale(partnerBShareVal))
+                .partnerBPaidTotal(scale(partnerBPaidVal))
+                .totalSettledAmount(scale(totalSettledVal))
+                .netBalance(netBalance)
                 .debtorEmail(debtor)
                 .creditorEmail(creditor)
                 .summaryText(summaryText)
                 .build();
+    }
+
+    private static BigDecimal scale(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** Owner of the workspace the account belongs to, i.e. whose money paid the expense. */
+    private String resolveAccountOwnerEmail(UUID accountId) {
+        return accountRepository.findById(accountId)
+                .flatMap(acc -> workspaceRepository.findById(acc.getWorkspaceId()))
+                .map(Workspace::getOwnerEmail)
+                .orElse(null);
     }
 
     @Override
