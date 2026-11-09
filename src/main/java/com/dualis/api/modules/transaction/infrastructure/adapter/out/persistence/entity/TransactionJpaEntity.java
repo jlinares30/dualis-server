@@ -63,6 +63,9 @@ public class TransactionJpaEntity {
     @Column(name = "original_currency", length = 10)
     private String originalCurrency;
 
+    @Column(name = "split_partner_a_percentage", precision = 5, scale = 2)
+    private BigDecimal splitPartnerAPercentage;
+
     @Column(name = "transaction_date", nullable = false)
     private OffsetDateTime transactionDate;
 

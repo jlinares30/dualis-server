@@ -1,5 +1,12 @@
 package com.dualis.api.modules.transaction.application.service;
 
+import java.util.List;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import com.dualis.api.modules.settlement.dto.response.SplitRuleResponse;
+import com.dualis.api.modules.settlement.application.usecase.ManageSplitRuleUseCase;
+import com.dualis.api.modules.category.dto.response.CategoryResponse;
+import com.dualis.api.modules.category.application.usecase.ManageCategoryUseCase;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +55,12 @@ class TransactionApplicationServiceTest {
 
     @Mock
     private VerifyWorkspaceAccessUseCase workspaceAccess;
+
+    @Mock
+    private ManageCategoryUseCase categoryUseCase;
+
+    @Mock
+    private ManageSplitRuleUseCase splitRuleUseCase;
 
     @InjectMocks
     private TransactionApplicationService transactionApplicationService;
@@ -209,5 +222,55 @@ class TransactionApplicationServiceTest {
 
         assertThatThrownBy(() -> transactionApplicationService.getTransactionById(txId))
                 .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    @DisplayName("Stores account currency, derives category nature and freezes the default split for couple expenses")
+    void createTransaction_CoupleExpense_DerivesNatureAndSplit() {
+        UUID categoryId = UUID.randomUUID();
+        Workspace couple = Workspace.builder().id(workspaceId).name("Pareja").type(WorkspaceType.COUPLE)
+                .currency("USD").ownerEmail("jorge@example.com").isActive(true).build();
+        CreateTransactionRequest request = CreateTransactionRequest.builder()
+                .workspaceId(workspaceId)
+                .accountId(primaryAccountId)
+                .categoryId(categoryId)
+                .type(TransactionType.EXPENSE)
+                .amount(new BigDecimal("80.00"))
+                .currency("PEN") // wrong currency sent by the client: the account is in USD
+                .build();
+
+        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(couple));
+        when(categoryUseCase.getCategoryById(categoryId)).thenReturn(
+                CategoryResponse.builder().id(categoryId).categoryNature(CategoryNature.ESSENTIAL).build());
+        when(splitRuleUseCase.getSplitRulesByWorkspace(workspaceId)).thenReturn(List.of(
+                SplitRuleResponse.builder().isDefault(true).partnerAPercentage(new BigDecimal("60")).build()));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TransactionResponse response = transactionApplicationService.createTransaction(request);
+
+        assertThat(response.getCurrency()).isEqualTo("USD");
+        assertThat(response.getCategoryNature()).isEqualTo(CategoryNature.ESSENTIAL);
+        assertThat(response.getSplitPartnerAPercentage()).isEqualByComparingTo("60.00");
+        assertThat(primaryAccount.getBalance().amount()).isEqualByComparingTo("420.00");
+    }
+
+    @Test
+    @DisplayName("Deleting a legacy transaction stored in another currency reverts in the account currency instead of failing")
+    void deleteTransaction_LegacyCurrencyMismatch_Reverts() {
+        UUID txId = UUID.randomUUID();
+        Transaction legacy = Transaction.builder()
+                .id(txId).workspaceId(workspaceId).accountId(primaryAccountId)
+                .type(TransactionType.EXPENSE)
+                .amount(Money.of(new BigDecimal("30.00"), "PEN")) // account is USD
+                .createdAt(OffsetDateTime.now())
+                .build();
+        when(transactionRepository.findById(txId)).thenReturn(Optional.of(legacy));
+        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+
+        transactionApplicationService.deleteTransaction(txId);
+
+        assertThat(primaryAccount.getBalance().amount()).isEqualByComparingTo("530.00");
+        verify(transactionRepository).delete(txId);
     }
 }

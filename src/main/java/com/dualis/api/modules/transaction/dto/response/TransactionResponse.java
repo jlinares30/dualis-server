@@ -34,6 +34,7 @@ public class TransactionResponse {
     private BigDecimal exchangeRate;
     private BigDecimal originalAmount;
     private String originalCurrency;
+    private BigDecimal splitPartnerAPercentage;
     private OffsetDateTime transactionDate;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -56,6 +57,7 @@ public class TransactionResponse {
                 .exchangeRate(t.getExchangeRate())
                 .originalAmount(t.getOriginalAmount())
                 .originalCurrency(t.getOriginalCurrency())
+                .splitPartnerAPercentage(t.getSplitPartnerAPercentage())
                 .transactionDate(t.getTransactionDate())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

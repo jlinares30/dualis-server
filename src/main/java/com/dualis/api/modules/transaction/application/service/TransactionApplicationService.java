@@ -1,5 +1,9 @@
 package com.dualis.api.modules.transaction.application.service;
 
+import com.dualis.api.modules.category.application.usecase.ManageCategoryUseCase;
+import com.dualis.api.modules.category.domain.model.CategoryNature;
+import com.dualis.api.modules.settlement.application.usecase.ManageSplitRuleUseCase;
+import com.dualis.api.modules.settlement.dto.response.SplitRuleResponse;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ForbiddenException;
 import com.dualis.api.exception.ResourceNotFoundException;
@@ -38,6 +42,10 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     private final TransactionRepositoryPort transactionRepository;
     private final AccountRepositoryPort accountRepository;
     private final WorkspaceRepositoryPort workspaceRepository;
+    private final ManageCategoryUseCase categoryUseCase;
+    private final ManageSplitRuleUseCase splitRuleUseCase;
+
+    private static final BigDecimal DEFAULT_SPLIT_PERCENTAGE = new BigDecimal("50.00");
 
     @Override
     @Transactional
@@ -58,7 +66,12 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
 
         applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
 
-        Money moneyAmount = Money.of(request.getAmount(), request.getCurrency() != null ? request.getCurrency() : Money.DEFAULT_CURRENCY);
+        // The transaction is always recorded in the currency of the account it moves money from,
+        // which is the currency its balance impact is applied in.
+        Money moneyAmount = Money.of(request.getAmount(), primaryAccount.getCurrency());
+        CategoryNature nature = resolveCategoryNature(request.getCategoryNature(), request.getCategoryId());
+        BigDecimal splitPercentage = resolveSplitPercentage(
+                request.getWorkspaceId(), request.getType(), request.getSplitPartnerAPercentage(), request.getSplitRuleId());
 
         Transaction transaction = Transaction.builder()
                 .workspaceId(request.getWorkspaceId())
@@ -68,12 +81,13 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 .targetAccountName(targetAccount != null ? targetAccount.getName() : null)
                 .categoryId(request.getCategoryId())
                 .type(request.getType())
-                .categoryNature(request.getCategoryNature())
+                .categoryNature(nature)
                 .amount(moneyAmount)
                 .description(request.getDescription())
                 .exchangeRate(request.getExchangeRate())
                 .originalAmount(request.getOriginalAmount())
                 .originalCurrency(request.getOriginalCurrency())
+                .splitPartnerAPercentage(splitPercentage)
                 .transactionDate(request.getTransactionDate() != null ? request.getTransactionDate() : OffsetDateTime.now())
                 .createdAt(OffsetDateTime.now())
                 .updatedAt(OffsetDateTime.now())
@@ -148,8 +162,12 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
         // Apply new balance impact
         applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
 
-        String currency = transaction.getAmount() != null ? transaction.getAmount().currency() : Money.DEFAULT_CURRENCY;
-        Money moneyAmount = Money.of(request.getAmount(), currency);
+        Money moneyAmount = Money.of(request.getAmount(), primaryAccount.getCurrency());
+        CategoryNature nature = resolveCategoryNature(request.getCategoryNature(), request.getCategoryId());
+        BigDecimal splitPercentage = request.getSplitPartnerAPercentage() != null || request.getSplitRuleId() != null
+                ? resolveSplitPercentage(transaction.getWorkspaceId(), request.getType(),
+                        request.getSplitPartnerAPercentage(), request.getSplitRuleId())
+                : null; // keep the percentage stored when the expense was created
 
         transaction.updateDetails(
                 primaryAccount.getId(),
@@ -158,10 +176,11 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 targetAccount != null ? targetAccount.getName() : null,
                 request.getCategoryId(),
                 request.getType(),
-                request.getCategoryNature(),
+                nature,
                 moneyAmount,
                 request.getDescription(),
-                request.getTransactionDate()
+                request.getTransactionDate(),
+                splitPercentage
         );
 
         Transaction updated = transactionRepository.save(transaction);
@@ -182,7 +201,9 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     private void revertBalanceImpact(Transaction transaction) {
         Account primaryAccount = findAccountById(transaction.getAccountId());
         Account targetAccount = transaction.getTargetAccountId() != null ? findAccountById(transaction.getTargetAccountId()) : null;
-        Money amount = transaction.getAmount();
+        // Revert exactly what applyBalanceImpact applied: the numeric amount in the primary account currency.
+        // This also repairs legacy rows stored with a currency different from their account's.
+        Money amount = Money.of(transaction.getAmount().amount(), primaryAccount.getCurrency());
 
         switch (transaction.getType()) {
             case INCOME -> primaryAccount.debit(amount);
@@ -258,26 +279,47 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     }
 
     private TransactionResponse mapToResponse(Transaction t) {
-        return TransactionResponse.builder()
-                .id(t.getId())
-                .workspaceId(t.getWorkspaceId())
-                .accountId(t.getAccountId())
-                .accountName(t.getAccountName())
-                .targetAccountId(t.getTargetAccountId())
-                .targetAccountName(t.getTargetAccountName())
-                .categoryId(t.getCategoryId())
-                .type(t.getType())
-                .categoryNature(t.getCategoryNature())
-                .amount(t.getAmount() != null ? t.getAmount().amount() : null)
-                .currency(t.getAmount() != null ? t.getAmount().currency() : Money.DEFAULT_CURRENCY)
-                .description(t.getDescription())
-                .exchangeRate(t.getExchangeRate())
-                .originalAmount(t.getOriginalAmount())
-                .originalCurrency(t.getOriginalCurrency())
-                .transactionDate(t.getTransactionDate())
-                .createdAt(t.getCreatedAt())
-                .updatedAt(t.getUpdatedAt())
-                .build();
+        return TransactionResponse.fromEntity(t);
+    }
+
+    private CategoryNature resolveCategoryNature(CategoryNature requested, UUID categoryId) {
+        if (requested != null) {
+            return requested;
+        }
+        if (categoryId == null) {
+            return null;
+        }
+        // Derive ESSENTIAL / NON_ESSENTIAL from the category so dashboards can classify the expense.
+        return categoryUseCase.getCategoryById(categoryId).getCategoryNature();
+    }
+
+    /**
+     * Resolves and freezes the share of partner A for a shared expense, so later changes to the
+     * workspace's split rule never rewrite the balance of past expenses.
+     */
+    private BigDecimal resolveSplitPercentage(UUID workspaceId, TransactionType type,
+                                              BigDecimal requested, UUID splitRuleId) {
+        if (type != TransactionType.EXPENSE) {
+            return null;
+        }
+        boolean isCouple = workspaceRepository.findById(workspaceId)
+                .map(w -> w.getType() == WorkspaceType.COUPLE)
+                .orElse(false);
+        if (!isCouple) {
+            return null;
+        }
+        if (requested != null) {
+            return requested.setScale(2, RoundingMode.HALF_UP);
+        }
+        java.util.Optional<SplitRuleResponse> rule = splitRuleId != null
+                ? java.util.Optional.of(splitRuleUseCase.getSplitRuleById(splitRuleId))
+                : splitRuleUseCase.getSplitRulesByWorkspace(workspaceId).stream()
+                        .filter(r -> Boolean.TRUE.equals(r.getIsDefault()))
+                        .findFirst();
+        return rule.map(SplitRuleResponse::getPartnerAPercentage)
+                .filter(java.util.Objects::nonNull)
+                .map(p -> p.setScale(2, RoundingMode.HALF_UP))
+                .orElse(DEFAULT_SPLIT_PERCENTAGE);
     }
 
     private static final Map<String, Double> FX_RATES_TO_USD = Map.of(

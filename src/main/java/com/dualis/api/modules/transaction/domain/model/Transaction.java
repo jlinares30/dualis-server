@@ -27,6 +27,8 @@ public class Transaction {
     private BigDecimal exchangeRate;
     private BigDecimal originalAmount;
     private String originalCurrency;
+    /** Share (0-100) of a shared expense assumed by partner A (the couple workspace owner). Snapshot taken when saved. */
+    private BigDecimal splitPartnerAPercentage;
     private OffsetDateTime transactionDate;
     private final OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -41,7 +43,8 @@ public class Transaction {
             CategoryNature categoryNature,
             Money amount,
             String description,
-            OffsetDateTime transactionDate
+            OffsetDateTime transactionDate,
+            BigDecimal splitPartnerAPercentage
     ) {
         this.accountId = accountId;
         this.accountName = accountName;
@@ -54,6 +57,9 @@ public class Transaction {
         this.description = description;
         if (transactionDate != null) {
             this.transactionDate = transactionDate;
+        }
+        if (splitPartnerAPercentage != null) {
+            this.splitPartnerAPercentage = splitPartnerAPercentage;
         }
         this.updatedAt = OffsetDateTime.now();
     }

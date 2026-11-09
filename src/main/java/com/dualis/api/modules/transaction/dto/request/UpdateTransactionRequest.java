@@ -2,6 +2,7 @@ package com.dualis.api.modules.transaction.dto.request;
 
 import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -40,4 +41,15 @@ public class UpdateTransactionRequest {
     private String description;
 
     private OffsetDateTime transactionDate;
+
+    /**
+     * Share (0-100) of a shared expense assumed by partner A (the couple workspace owner).
+     * When omitted for an expense in a COUPLE workspace, the workspace's default split rule is used.
+     */
+    @DecimalMin(value = "0.0", message = "Split percentage cannot be negative")
+    @DecimalMax(value = "100.0", message = "Split percentage cannot exceed 100")
+    private BigDecimal splitPartnerAPercentage;
+
+    /** Optional split rule used to resolve the percentage when splitPartnerAPercentage is omitted. */
+    private UUID splitRuleId;
 }
