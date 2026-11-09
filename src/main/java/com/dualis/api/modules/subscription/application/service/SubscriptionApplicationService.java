@@ -1,5 +1,19 @@
 package com.dualis.api.modules.subscription.application.service;
 
+import com.dualis.api.modules.subscription.domain.model.SubscriptionPayment;
+import com.dualis.api.modules.subscription.domain.repository.SubscriptionPaymentRepositoryPort;
+import com.dualis.api.modules.subscription.dto.request.PaySubscriptionRequest;
+import com.dualis.api.modules.subscription.dto.response.SubscriptionPaymentResponse;
+import com.dualis.api.modules.transaction.application.usecase.ManageTransactionUseCase;
+import com.dualis.api.modules.transaction.domain.model.TransactionType;
+import com.dualis.api.modules.transaction.dto.request.CreateTransactionRequest;
+import com.dualis.api.modules.transaction.dto.response.TransactionResponse;
+import org.springframework.beans.factory.annotation.Value;
+import java.math.BigDecimal;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.util.Map;
+import java.util.stream.Collectors;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.subscription.application.usecase.ManageSubscriptionUseCase;
@@ -31,6 +45,12 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final SubscriptionRepositoryPort subscriptionRepository;
     private final SalaryDistributionConfigRepositoryPort salaryDistributionConfigRepository;
+    private final SubscriptionPaymentRepositoryPort paymentRepository;
+    private final ManageTransactionUseCase transactionUseCase;
+
+    /** Time zone used to decide which month "now" belongs to. */
+    @Value("${app.timezone:America/Lima}")
+    private String timezone = "America/Lima";
 
     @Override
     @Transactional
@@ -51,29 +71,151 @@ public class SubscriptionApplicationService implements ManageSubscriptionUseCase
                 .build();
 
         Subscription saved = subscriptionRepository.save(sub);
-        return SubscriptionResponse.fromDomain(saved);
+        YearMonth current = currentPeriod();
+        return SubscriptionResponse.fromDomain(saved, current.getYear(), current.getMonthValue(), null);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SubscriptionResponse> getSubscriptionsByWorkspace(UUID workspaceId) {
+        return getSubscriptionsByWorkspace(workspaceId, null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubscriptionResponse> getSubscriptionsByWorkspace(UUID workspaceId, Integer periodYear, Integer periodMonth) {
         workspaceAccess.assertCurrentUserIsMember(workspaceId);
+        YearMonth period = resolvePeriod(periodYear, periodMonth);
+
+        Map<UUID, SubscriptionPayment> paymentsBySubscription = paymentRepository
+                .findByWorkspaceIdAndPeriod(workspaceId, period.getYear(), period.getMonthValue()).stream()
+                .collect(Collectors.toMap(SubscriptionPayment::getSubscriptionId, p -> p, (a, b) -> a));
+
         return subscriptionRepository.findByWorkspaceId(workspaceId).stream()
-                .map(SubscriptionResponse::fromDomain)
+                .map(sub -> SubscriptionResponse.fromDomain(sub, period.getYear(), period.getMonthValue(),
+                        paymentsBySubscription.get(sub.getId())))
                 .toList();
     }
 
     @Override
     @Transactional
     public SubscriptionResponse togglePaidStatus(UUID subscriptionId) {
+        Subscription sub = loadAuthorized(subscriptionId);
+        YearMonth current = currentPeriod();
+        boolean paid = paymentRepository
+                .findBySubscriptionIdAndPeriod(sub.getId(), current.getYear(), current.getMonthValue())
+                .isPresent();
+        return paid
+                ? undoPayment(subscriptionId, current.getYear(), current.getMonthValue())
+                : paySubscription(subscriptionId, PaySubscriptionRequest.builder()
+                        .periodYear(current.getYear())
+                        .periodMonth(current.getMonthValue())
+                        .build());
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionResponse paySubscription(UUID subscriptionId, PaySubscriptionRequest request) {
+        Subscription sub = loadAuthorized(subscriptionId);
+        PaySubscriptionRequest req = request != null ? request : new PaySubscriptionRequest();
+        YearMonth period = resolvePeriod(req.getPeriodYear(), req.getPeriodMonth());
+
+        if (paymentRepository.findBySubscriptionIdAndPeriod(sub.getId(), period.getYear(), period.getMonthValue()).isPresent()) {
+            throw new IllegalStateException(String.format("%s is already paid for %02d/%d",
+                    sub.getName(), period.getMonthValue(), period.getYear()));
+        }
+
+        BigDecimal amount = req.getAmount() != null ? req.getAmount() : sub.getAmount().amount();
+        String currency = sub.getAmount() != null ? sub.getAmount().currency() : "PEN";
+        OffsetDateTime now = OffsetDateTime.now();
+
+        UUID transactionId = null;
+        if (req.getAccountId() != null) {
+            // Record the real expense in the same database transaction as the payment.
+            TransactionResponse tx = transactionUseCase.createTransaction(CreateTransactionRequest.builder()
+                    .workspaceId(sub.getWorkspaceId())
+                    .accountId(req.getAccountId())
+                    .type(TransactionType.EXPENSE)
+                    .amount(amount)
+                    .currency(currency)
+                    .description(String.format("Pago de servicio: %s (%02d/%d)",
+                            sub.getName(), period.getMonthValue(), period.getYear()))
+                    .transactionDate(now)
+                    .build());
+            transactionId = tx.getId();
+        }
+
+        SubscriptionPayment payment = paymentRepository.save(SubscriptionPayment.builder()
+                .subscriptionId(sub.getId())
+                .workspaceId(sub.getWorkspaceId())
+                .periodYear(period.getYear())
+                .periodMonth(period.getMonthValue())
+                .amount(Money.of(amount, currency))
+                .paidAt(now)
+                .paidByEmail(workspaceAccess.currentUserEmail())
+                .transactionId(transactionId)
+                .createdAt(now)
+                .build());
+
+        return SubscriptionResponse.fromDomain(sub, period.getYear(), period.getMonthValue(), payment);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionResponse undoPayment(UUID subscriptionId, Integer periodYear, Integer periodMonth) {
+        Subscription sub = loadAuthorized(subscriptionId);
+        YearMonth period = resolvePeriod(periodYear, periodMonth);
+
+        SubscriptionPayment payment = paymentRepository
+                .findBySubscriptionIdAndPeriod(sub.getId(), period.getYear(), period.getMonthValue())
+                .orElseThrow(() -> new ResourceNotFoundException(String.format(
+                        "No payment registered for %s in %02d/%d", sub.getName(), period.getMonthValue(), period.getYear())));
+
+        if (payment.getTransactionId() != null) {
+            try {
+                // Reverts the account balance as well.
+                transactionUseCase.deleteTransaction(payment.getTransactionId());
+            } catch (ResourceNotFoundException alreadyDeleted) {
+                // The user already removed the expense manually; nothing to revert.
+            }
+        }
+        paymentRepository.delete(payment.getId());
+
+        return SubscriptionResponse.fromDomain(sub, period.getYear(), period.getMonthValue(), null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubscriptionPaymentResponse> getPaymentHistory(UUID subscriptionId) {
+        Subscription sub = loadAuthorized(subscriptionId);
+        return paymentRepository.findBySubscriptionId(sub.getId()).stream()
+                .map(SubscriptionPaymentResponse::fromDomain)
+                .toList();
+    }
+
+    private Subscription loadAuthorized(UUID subscriptionId) {
         Subscription sub = subscriptionRepository.findById(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + subscriptionId));
         workspaceAccess.assertCurrentUserIsMember(sub.getWorkspaceId());
+        return sub;
+    }
 
-        sub.togglePaidStatus();
+    private YearMonth currentPeriod() {
+        String zone = timezone != null && !timezone.isBlank() ? timezone : "America/Lima";
+        return YearMonth.now(ZoneId.of(zone));
+    }
 
-        Subscription updated = subscriptionRepository.save(sub);
-        return SubscriptionResponse.fromDomain(updated);
+    private YearMonth resolvePeriod(Integer year, Integer month) {
+        if (year == null && month == null) {
+            return currentPeriod();
+        }
+        if (year == null || month == null) {
+            throw new IllegalArgumentException("Both periodYear and periodMonth must be provided");
+        }
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("periodMonth must be between 1 and 12");
+        }
+        return YearMonth.of(year, month);
     }
 
     @Override

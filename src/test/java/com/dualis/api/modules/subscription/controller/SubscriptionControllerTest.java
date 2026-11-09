@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -90,7 +91,7 @@ class SubscriptionControllerTest {
     @Test
     @DisplayName("GET /api/v1/subscriptions - Should return list")
     void getSubscriptionsByWorkspace_ShouldReturnList() throws Exception {
-        when(subscriptionService.getSubscriptionsByWorkspace(eq(workspaceId))).thenReturn(List.of(subscriptionResponse));
+        when(subscriptionService.getSubscriptionsByWorkspace(eq(workspaceId), isNull(), isNull())).thenReturn(List.of(subscriptionResponse));
 
         mockMvc.perform(get("/api/v1/subscriptions")
                         .param("workspaceId", workspaceId.toString()))

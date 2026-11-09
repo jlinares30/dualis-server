@@ -27,6 +27,8 @@ spring:
     locations: classpath:db/migration
 
 app:
+  # Time zone that defines "the current month" (monthly bills, periods).
+  timezone: ${APP_TIMEZONE:America/Lima}
   jwt:
     # Required. No default on purpose: the app refuses to start without it.
     secret: ${APP_JWT_SECRET:}
