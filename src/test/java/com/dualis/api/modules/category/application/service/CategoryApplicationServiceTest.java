@@ -1,5 +1,9 @@
 package com.dualis.api.modules.category.application.service;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.category.dto.request.CreateCategoryRequest;
 import com.dualis.api.modules.category.dto.response.CategoryResponse;
 import com.dualis.api.modules.category.domain.model.Category;
@@ -28,6 +32,9 @@ class CategoryApplicationServiceTest {
 
     @Mock
     private CategoryRepositoryPort categoryRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private CategoryApplicationService categoryApplicationService;
@@ -93,5 +100,25 @@ class CategoryApplicationServiceTest {
         List<CategoryResponse> list = categoryApplicationService.getCategoriesByWorkspace(workspaceId, null);
 
         assertThat(list).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should not allow deleting system default categories")
+    void deleteCategory_SystemDefault_Rejected() {
+        UUID systemCategoryId = UUID.randomUUID();
+        Category systemCategory = Category.builder()
+                .id(systemCategoryId)
+                .workspaceId(null)
+                .name("Alimentación")
+                .type(CategoryType.EXPENSE)
+                .isSystemDefault(true)
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
+                .build();
+        when(categoryRepository.findById(systemCategoryId)).thenReturn(Optional.of(systemCategory));
+
+        assertThatThrownBy(() -> categoryApplicationService.deleteCategory(systemCategoryId))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(categoryRepository, never()).delete(any());
     }
 }

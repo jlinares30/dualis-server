@@ -1,5 +1,6 @@
 package com.dualis.api.modules.account.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
 import com.dualis.api.modules.account.domain.model.AccountType;
 import com.dualis.api.modules.account.dto.request.CreateAccountRequest;
@@ -33,6 +34,9 @@ class AccountApplicationServiceTest {
 
     @Mock
     private AccountRepositoryPort accountRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private AccountApplicationService accountApplicationService;

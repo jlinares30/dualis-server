@@ -2,6 +2,7 @@ package com.dualis.api.modules.workspace.infrastructure.adapter.out.persistence.
 
 import com.dualis.api.modules.workspace.infrastructure.adapter.out.persistence.entity.WorkspaceJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,8 @@ public interface SpringDataWorkspaceRepository extends JpaRepository<WorkspaceJp
 
     @Query("SELECT DISTINCT w FROM WorkspaceJpaEntity w JOIN w.members m WHERE m.userEmail = :userEmail AND (w.isActive = true OR w.type = com.dualis.api.modules.workspace.domain.model.WorkspaceType.INDIVIDUAL)")
     List<WorkspaceJpaEntity> findWorkspacesByUserEmail(@Param("userEmail") String userEmail);
+
+    @Modifying
+    @Query("DELETE FROM WorkspaceMemberJpaEntity m WHERE m.workspace.id = :workspaceId AND LOWER(m.userEmail) = LOWER(:userEmail)")
+    void deleteMember(@Param("workspaceId") UUID workspaceId, @Param("userEmail") String userEmail);
 }

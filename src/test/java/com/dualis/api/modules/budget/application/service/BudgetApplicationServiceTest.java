@@ -1,5 +1,6 @@
 package com.dualis.api.modules.budget.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.budget.domain.model.Budget;
 import com.dualis.api.modules.budget.domain.repository.BudgetRepositoryPort;
 import com.dualis.api.modules.budget.dto.request.CreateBudgetRequest;
@@ -32,6 +33,9 @@ class BudgetApplicationServiceTest {
 
     @Mock
     private TransactionRepositoryPort transactionRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private BudgetApplicationService budgetApplicationService;

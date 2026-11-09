@@ -1,5 +1,6 @@
 package com.dualis.api.modules.savingsgoal.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.savingsgoal.dto.request.CreateGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.request.DepositGoalRequest;
 import com.dualis.api.modules.savingsgoal.dto.response.SavingsGoalResponse;
@@ -30,6 +31,9 @@ class SavingsGoalApplicationServiceTest {
 
     @Mock
     private SavingsGoalRepositoryPort savingsGoalRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private SavingsGoalApplicationService savingsGoalApplicationService;
@@ -109,7 +113,7 @@ class SavingsGoalApplicationServiceTest {
     @Test
     @DisplayName("Should delete goal successfully")
     void deleteGoal_Success() {
-        when(savingsGoalRepository.existsById(goalId)).thenReturn(true);
+        when(savingsGoalRepository.findById(goalId)).thenReturn(Optional.of(goal));
 
         savingsGoalApplicationService.deleteGoal(goalId);
 

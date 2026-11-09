@@ -1,5 +1,7 @@
 package com.dualis.api.modules.settlement.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
+import com.dualis.api.exception.ForbiddenException;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.settlement.application.usecase.ManageSettlementUseCase;
 import com.dualis.api.modules.settlement.domain.model.Settlement;
@@ -35,6 +37,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SettlementApplicationService implements ManageSettlementUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final SettlementRepositoryPort settlementRepository;
     private final SplitRuleRepositoryPort splitRuleRepository;
     private final TransactionRepositoryPort transactionRepository;
@@ -44,6 +47,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     @Override
     @Transactional(readOnly = true)
     public DebtBalanceSummaryResponse getDebtBalanceSummary(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + workspaceId));
 
@@ -173,6 +177,15 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     @Override
     @Transactional
     public SettlementResponse createSettlement(CreateSettlementRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
+        if (!workspaceAccess.isMember(request.getWorkspaceId(), request.getPayerEmail())
+                || !workspaceAccess.isMember(request.getWorkspaceId(), request.getRecipientEmail())) {
+            throw new IllegalArgumentException("Payer and recipient must both be members of the workspace");
+        }
+        String currentUser = workspaceAccess.currentUserEmail();
+        if (!currentUser.equalsIgnoreCase(request.getPayerEmail()) && !currentUser.equalsIgnoreCase(request.getRecipientEmail())) {
+            throw new ForbiddenException("You can only register settlements in which you are the payer or the recipient");
+        }
         Money amount = Money.of(request.getAmount(), request.getCurrency());
 
         Settlement settlement = Settlement.builder()
@@ -194,6 +207,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<SettlementResponse> getSettlementsByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return settlementRepository.findByWorkspaceId(workspaceId).stream()
                 .map(SettlementResponse::fromEntity)
                 .toList();
@@ -204,6 +218,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     public SettlementResponse completeSettlement(UUID id) {
         Settlement settlement = settlementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Settlement not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(settlement.getWorkspaceId());
 
         settlement.complete();
         Settlement saved = settlementRepository.save(settlement);
@@ -215,6 +230,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     public void cancelSettlement(UUID id) {
         Settlement settlement = settlementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Settlement not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(settlement.getWorkspaceId());
 
         settlement.cancel();
         settlementRepository.save(settlement);

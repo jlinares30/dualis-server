@@ -1,5 +1,6 @@
 package com.dualis.api.modules.category.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.category.application.usecase.ManageCategoryUseCase;
 import com.dualis.api.modules.category.domain.model.Category;
@@ -21,11 +22,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CategoryApplicationService implements ManageCategoryUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final CategoryRepositoryPort categoryRepository;
 
     @Override
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         CategoryType domainType = request.getType() != null
                 ? request.getType()
                 : CategoryType.EXPENSE;
@@ -51,6 +54,7 @@ public class CategoryApplicationService implements ManageCategoryUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponse> getCategoriesByWorkspace(UUID workspaceId, CategoryType type) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         List<Category> list = categoryRepository.findByWorkspaceIdOrSystemDefault(workspaceId);
         if (type != null) {
             list = list.stream()
@@ -65,6 +69,10 @@ public class CategoryApplicationService implements ManageCategoryUseCase {
     public CategoryResponse getCategoryById(UUID id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        // System default categories are shared and readable by every authenticated user.
+        if (!category.isSystemDefault()) {
+            workspaceAccess.assertCurrentUserIsMember(category.getWorkspaceId());
+        }
         return CategoryResponse.fromDomain(category);
     }
 
@@ -77,6 +85,7 @@ public class CategoryApplicationService implements ManageCategoryUseCase {
         if (category.isSystemDefault()) {
             throw new IllegalArgumentException("System default categories cannot be modified");
         }
+        workspaceAccess.assertCurrentUserIsMember(category.getWorkspaceId());
 
         category.updateDetails(
                 request.getName(),
@@ -95,6 +104,10 @@ public class CategoryApplicationService implements ManageCategoryUseCase {
     public void deleteCategory(UUID id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        if (category.isSystemDefault()) {
+            throw new IllegalArgumentException("System default categories cannot be deleted");
+        }
+        workspaceAccess.assertCurrentUserIsMember(category.getWorkspaceId());
         categoryRepository.delete(id);
     }
 }

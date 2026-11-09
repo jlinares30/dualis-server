@@ -47,4 +47,9 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepositoryPort {
     public void delete(UUID id) {
         springDataWorkspaceRepository.deleteById(id);
     }
+
+    @Override
+    public void removeMember(UUID workspaceId, String userEmail) {
+        springDataWorkspaceRepository.deleteMember(workspaceId, userEmail);
+    }
 }

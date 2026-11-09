@@ -1,5 +1,6 @@
 package com.dualis.api.modules.investment.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.investment.application.usecase.ManageInvestmentUseCase;
 import com.dualis.api.modules.investment.domain.model.Investment;
@@ -21,11 +22,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InvestmentApplicationService implements ManageInvestmentUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final InvestmentRepositoryPort repository;
 
     @Override
     @Transactional
     public InvestmentResponse createInvestment(CreateInvestmentRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         String currency = request.getCurrency() != null && !request.getCurrency().isBlank()
                 ? request.getCurrency().trim().toUpperCase()
                 : "PEN";
@@ -50,6 +53,7 @@ public class InvestmentApplicationService implements ManageInvestmentUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<InvestmentResponse> getInvestmentsByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return repository.findByWorkspaceId(workspaceId).stream()
                 .map(InvestmentResponse::fromDomain)
                 .toList();
@@ -60,6 +64,7 @@ public class InvestmentApplicationService implements ManageInvestmentUseCase {
     public InvestmentResponse updateInvestment(UUID id, UpdateInvestmentRequest request) {
         Investment investment = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Investment not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(investment.getWorkspaceId());
 
         investment.updateDetails(
                 request.getName(),
@@ -76,9 +81,9 @@ public class InvestmentApplicationService implements ManageInvestmentUseCase {
     @Override
     @Transactional
     public void deleteInvestment(UUID id) {
-        if (!repository.existsById(id)) {
-            throw new ResourceNotFoundException("Investment not found with id: " + id);
-        }
+        Investment investment = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Investment not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(investment.getWorkspaceId());
         repository.delete(id);
     }
 }

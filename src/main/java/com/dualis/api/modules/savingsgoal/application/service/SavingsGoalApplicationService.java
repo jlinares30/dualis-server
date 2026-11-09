@@ -1,5 +1,6 @@
 package com.dualis.api.modules.savingsgoal.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.savingsgoal.application.usecase.ManageSavingsGoalUseCase;
 import com.dualis.api.modules.savingsgoal.domain.model.SavingsGoal;
@@ -22,11 +23,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final SavingsGoalRepositoryPort savingsGoalRepository;
 
     @Override
     @Transactional
     public SavingsGoalResponse createGoal(CreateGoalRequest request) {
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
         String currency = request.getCurrency() != null ? request.getCurrency() : "PEN";
         BigDecimal initialAmount = request.getCurrentAmount() != null ? request.getCurrentAmount() : BigDecimal.ZERO;
 
@@ -49,6 +52,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<SavingsGoalResponse> getGoalsByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return savingsGoalRepository.findByWorkspaceId(workspaceId).stream()
                 .map(SavingsGoalResponse::fromDomain)
                 .toList();
@@ -59,6 +63,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
     public SavingsGoalResponse depositToGoal(UUID goalId, DepositGoalRequest request) {
         SavingsGoal goal = savingsGoalRepository.findById(goalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+        workspaceAccess.assertCurrentUserIsMember(goal.getWorkspaceId());
 
         goal.deposit(request.getAmount());
 
@@ -71,6 +76,7 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
     public SavingsGoalResponse withdrawFromGoal(UUID goalId, com.dualis.api.modules.savingsgoal.dto.request.WithdrawGoalRequest request) {
         SavingsGoal goal = savingsGoalRepository.findById(goalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+        workspaceAccess.assertCurrentUserIsMember(goal.getWorkspaceId());
 
         goal.withdraw(request.getAmount());
 
@@ -82,7 +88,8 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
     @Transactional
     public SavingsGoalResponse updateGoal(UUID goalId, UpdateGoalRequest request) {
         SavingsGoal goal = savingsGoalRepository.findById(goalId)
-                .orElseThrow(() -> new ResourceNotFoundException(String.valueOf(goalId)));
+                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+        workspaceAccess.assertCurrentUserIsMember(goal.getWorkspaceId());
 
         goal.updateDetails(
                 request.getName(),
@@ -101,9 +108,9 @@ public class SavingsGoalApplicationService implements ManageSavingsGoalUseCase {
     @Override
     @Transactional
     public void deleteGoal(UUID goalId) {
-        if (!savingsGoalRepository.existsById(goalId)) {
-            throw new ResourceNotFoundException("Goal not found with id: " + goalId);
-        }
+        SavingsGoal goal = savingsGoalRepository.findById(goalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+        workspaceAccess.assertCurrentUserIsMember(goal.getWorkspaceId());
         savingsGoalRepository.delete(goalId);
     }
 }

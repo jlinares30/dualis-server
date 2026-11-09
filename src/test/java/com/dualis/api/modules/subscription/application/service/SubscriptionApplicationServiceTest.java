@@ -1,5 +1,6 @@
 package com.dualis.api.modules.subscription.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.subscription.dto.request.CreateSubscriptionRequest;
 import com.dualis.api.modules.subscription.dto.response.SubscriptionResponse;
 import com.dualis.api.modules.subscription.domain.model.Subscription;
@@ -28,6 +29,9 @@ class SubscriptionApplicationServiceTest {
 
     @Mock
     private SubscriptionRepositoryPort subscriptionRepository;
+
+    @Mock
+    private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @InjectMocks
     private SubscriptionApplicationService subscriptionApplicationService;
@@ -104,7 +108,7 @@ class SubscriptionApplicationServiceTest {
     @Test
     @DisplayName("Should delete subscription successfully")
     void deleteSubscription_Success() {
-        when(subscriptionRepository.existsById(subscriptionId)).thenReturn(true);
+        when(subscriptionRepository.findById(subscriptionId)).thenReturn(Optional.of(subscription));
 
         subscriptionApplicationService.deleteSubscription(subscriptionId);
 

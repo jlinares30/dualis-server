@@ -17,8 +17,6 @@ public class JoinWorkspaceRequest {
     @Schema(description = "6-character alphanumeric invitation code", example = "DUAL8X")
     private String invitationCode;
 
-    @NotBlank(message = "Partner email is required")
-    @Email(message = "Partner email must be valid")
-    @Schema(description = "Email of the joining partner", example = "maria@example.com")
+    @Schema(description = "Deprecated and ignored: the joining user is always the authenticated user", deprecated = true)
     private String partnerEmail;
 }

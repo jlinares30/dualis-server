@@ -1,5 +1,7 @@
 package com.dualis.api.modules.transaction.application.service;
 
+import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
+import com.dualis.api.exception.ForbiddenException;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
@@ -32,6 +34,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransactionApplicationService implements ManageTransactionUseCase {
 
+    private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final TransactionRepositoryPort transactionRepository;
     private final AccountRepositoryPort accountRepository;
     private final WorkspaceRepositoryPort workspaceRepository;
@@ -39,7 +42,8 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     @Override
     @Transactional
     public TransactionResponse createTransaction(CreateTransactionRequest request) {
-        Account primaryAccount = findActiveAccount(request.getAccountId(), request.getWorkspaceId());
+        workspaceAccess.assertCurrentUserIsMember(request.getWorkspaceId());
+        Account primaryAccount = findActiveAccount(request.getAccountId(), request.getWorkspaceId(), true);
 
         Account targetAccount = null;
         if (request.getType() == TransactionType.TRANSFER) {
@@ -49,7 +53,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             if (request.getAccountId().equals(request.getTargetAccountId())) {
                 throw new IllegalArgumentException("Source and target accounts must be different for transfers");
             }
-            targetAccount = findActiveAccount(request.getTargetAccountId(), request.getWorkspaceId());
+            targetAccount = findActiveAccount(request.getTargetAccountId(), request.getWorkspaceId(), true);
         }
 
         applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
@@ -82,6 +86,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<TransactionResponse> getTransactionsByWorkspace(UUID workspaceId) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return transactionRepository.findByWorkspaceId(workspaceId).stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -99,6 +104,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             String search,
             Pageable pageable
     ) {
+        workspaceAccess.assertCurrentUserIsMember(workspaceId);
         return transactionRepository.findTransactions(
                 workspaceId, accountId, type, categoryId, startDate, endDate, search, pageable
         ).map(this::mapToResponse);
@@ -109,6 +115,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     public TransactionResponse getTransactionById(UUID id) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(transaction.getWorkspaceId());
         return mapToResponse(transaction);
     }
 
@@ -117,11 +124,15 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     public TransactionResponse updateTransaction(UUID id, UpdateTransactionRequest request) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(transaction.getWorkspaceId());
 
         // Revert previous balance impact
         revertBalanceImpact(transaction);
 
-        Account primaryAccount = findActiveAccount(request.getAccountId(), transaction.getWorkspaceId());
+        // Accounts already linked to this transaction may stay (e.g. a partner editing a shared expense);
+        // switching to a different account requires the user to have access to that account's workspace.
+        Account primaryAccount = findActiveAccount(request.getAccountId(), transaction.getWorkspaceId(),
+                !isAccountOfTransaction(request.getAccountId(), transaction));
         Account targetAccount = null;
         if (request.getType() == TransactionType.TRANSFER) {
             if (request.getTargetAccountId() == null) {
@@ -130,7 +141,8 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             if (request.getAccountId().equals(request.getTargetAccountId())) {
                 throw new IllegalArgumentException("Source and target accounts must be different for transfers");
             }
-            targetAccount = findActiveAccount(request.getTargetAccountId(), transaction.getWorkspaceId());
+            targetAccount = findActiveAccount(request.getTargetAccountId(), transaction.getWorkspaceId(),
+                    !isAccountOfTransaction(request.getTargetAccountId(), transaction));
         }
 
         // Apply new balance impact
@@ -161,6 +173,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     public void deleteTransaction(UUID id) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction not found with id: " + id));
+        workspaceAccess.assertCurrentUserIsMember(transaction.getWorkspaceId());
 
         revertBalanceImpact(transaction);
         transactionRepository.delete(id);
@@ -199,8 +212,21 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
         accountRepository.save(primaryAccount);
     }
 
-    private Account findActiveAccount(UUID accountId, UUID workspaceId) {
+    private boolean isAccountOfTransaction(UUID accountId, Transaction transaction) {
+        return accountId != null
+                && (accountId.equals(transaction.getAccountId()) || accountId.equals(transaction.getTargetAccountId()));
+    }
+
+    private Account findActiveAccount(UUID accountId, UUID workspaceId, boolean requireCurrentUserAccess) {
         Account account = findAccountById(accountId);
+
+        // A user may only move money from/to accounts of workspaces they belong to
+        // (prevents using a partner's personal account from the shared workspace).
+        if (requireCurrentUserAccess
+                && !account.getWorkspaceId().equals(workspaceId)
+                && !workspaceAccess.isMember(account.getWorkspaceId(), workspaceAccess.currentUserEmail())) {
+            throw new ForbiddenException("You do not have access to account " + accountId);
+        }
 
         if (!account.getWorkspaceId().equals(workspaceId)) {
             boolean isAllowed = false;

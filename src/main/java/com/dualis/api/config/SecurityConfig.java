@@ -16,7 +16,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Configuration
@@ -58,6 +62,13 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        // Missing/invalid/expired token -> 401 (Spring's default would be 403)
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeError(response, HttpStatus.UNAUTHORIZED, "Authentication is required"))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeError(response, HttpStatus.FORBIDDEN, "Access denied"))
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/health",
@@ -72,5 +83,16 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private static void writeError(jakarta.servlet.http.HttpServletResponse response, HttpStatus status, String message)
+            throws java.io.IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        String body = String.format(
+                "{\"timestamp\":\"%s\",\"status\":%d,\"error\":\"%s\",\"message\":\"%s\"}",
+                OffsetDateTime.now(), status.value(), status.getReasonPhrase(), message);
+        response.getWriter().write(body);
     }
 }

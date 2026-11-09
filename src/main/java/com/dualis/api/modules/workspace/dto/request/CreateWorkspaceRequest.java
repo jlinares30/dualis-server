@@ -34,8 +34,6 @@ public class CreateWorkspaceRequest {
     @Schema(description = "ISO 4217 Currency code", example = "USD")
     private String currency;
 
-    @NotBlank(message = "Owner email is required")
-    @Email(message = "Owner email must be valid")
-    @Schema(description = "Email of the workspace creator", example = "jorge@example.com")
+    @Schema(description = "Deprecated and ignored: the owner is always the authenticated user", deprecated = true)
     private String ownerEmail;
 }
