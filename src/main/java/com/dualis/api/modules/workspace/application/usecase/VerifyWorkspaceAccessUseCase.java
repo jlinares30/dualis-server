@@ -17,6 +17,9 @@ public interface VerifyWorkspaceAccessUseCase {
     /** Throws ForbiddenException if the authenticated user is not the owner of the workspace. */
     void assertCurrentUserIsOwner(UUID workspaceId);
 
+    /** Whether the authenticated user is the owner (partner A) of the workspace. */
+    boolean isCurrentUserOwner(UUID workspaceId);
+
     /** Whether the given email is a member of the workspace. */
     boolean isMember(UUID workspaceId, String email);
 }

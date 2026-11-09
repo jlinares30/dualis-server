@@ -13,4 +13,7 @@ public interface ManageAuthUseCase {
     UserProfileResponse getCurrentUserProfile(String email);
     UserProfileResponse updateProfile(String email, UpdateProfileRequest request);
     UserProfileResponse completeOnboarding(String email, OnboardingRequest request);
+
+    /** Display names (first + last name) of registered users, keyed by lower-case email. */
+    java.util.Map<String, String> getDisplayNamesByEmail(java.util.Collection<String> emails);
 }

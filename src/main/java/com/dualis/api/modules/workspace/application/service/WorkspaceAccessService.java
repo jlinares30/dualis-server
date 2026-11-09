@@ -51,6 +51,13 @@ public class WorkspaceAccessService implements VerifyWorkspaceAccessUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean isCurrentUserOwner(UUID workspaceId) {
+        Workspace workspace = loadWorkspace(workspaceId);
+        return currentUserEmail().equalsIgnoreCase(workspace.getOwnerEmail());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean isMember(UUID workspaceId, String email) {
         if (workspaceId == null || email == null || email.isBlank()) {
             return false;

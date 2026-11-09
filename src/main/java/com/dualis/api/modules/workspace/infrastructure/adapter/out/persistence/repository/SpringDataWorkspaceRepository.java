@@ -16,7 +16,7 @@ public interface SpringDataWorkspaceRepository extends JpaRepository<WorkspaceJp
 
     Optional<WorkspaceJpaEntity> findByInvitationCode(String invitationCode);
 
-    @Query("SELECT DISTINCT w FROM WorkspaceJpaEntity w JOIN w.members m WHERE m.userEmail = :userEmail AND (w.isActive = true OR w.type = com.dualis.api.modules.workspace.domain.model.WorkspaceType.INDIVIDUAL)")
+    @Query("SELECT DISTINCT w FROM WorkspaceJpaEntity w JOIN w.members m WHERE LOWER(m.userEmail) = LOWER(:userEmail) AND (w.isActive = true OR w.type = com.dualis.api.modules.workspace.domain.model.WorkspaceType.INDIVIDUAL)")
     List<WorkspaceJpaEntity> findWorkspacesByUserEmail(@Param("userEmail") String userEmail);
 
     @Modifying

@@ -44,7 +44,7 @@ public class AuthApplicationService implements ManageAuthUseCase {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+        if (userRepository.existsByEmailIgnoreCase(request.getEmail().trim())) {
             throw new IllegalArgumentException("An account with email " + request.getEmail() + " already exists");
         }
 
@@ -216,5 +216,27 @@ public class AuthApplicationService implements ManageAuthUseCase {
         }
 
         return UserProfileResponse.fromDomain(updatedUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, String> getDisplayNamesByEmail(java.util.Collection<String> emails) {
+        java.util.Map<String, String> names = new java.util.HashMap<>();
+        if (emails == null) {
+            return names;
+        }
+        for (String email : emails) {
+            if (email == null || email.isBlank()) continue;
+            String key = email.trim().toLowerCase();
+            if (names.containsKey(key)) continue;
+            userRepository.findByEmailIgnoreCase(key).ifPresent(u -> {
+                String full = ((u.getFirstName() != null ? u.getFirstName() : "") + " "
+                        + (u.getLastName() != null ? u.getLastName() : "")).trim();
+                if (!full.isBlank()) {
+                    names.put(key, full);
+                }
+            });
+        }
+        return names;
     }
 }

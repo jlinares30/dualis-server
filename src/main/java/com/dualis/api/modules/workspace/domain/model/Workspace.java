@@ -38,7 +38,8 @@ public class Workspace {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    public void addMember(String email, WorkspaceRole role) {
+    public void addMember(String rawEmail, WorkspaceRole role) {
+        String email = rawEmail != null ? rawEmail.trim().toLowerCase() : null;
         if (members == null) {
             members = new ArrayList<>();
         }

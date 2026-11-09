@@ -1,6 +1,7 @@
 package com.dualis.api.modules.workspace.application.service;
 
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
+import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
@@ -38,6 +39,9 @@ class WorkspaceApplicationServiceTest {
 
     @Mock
     private VerifyWorkspaceAccessUseCase workspaceAccess;
+
+    @Mock
+    private ManageAuthUseCase userDirectory;
 
     @InjectMocks
     private WorkspaceApplicationService workspaceApplicationService;
@@ -171,5 +175,36 @@ class WorkspaceApplicationServiceTest {
         assertThat(workspace.isActive()).isTrue();
         verify(workspaceRepository, never()).save(any());
         verify(workspaceRepository, never()).removeMember(any(), any());
+    }
+
+    @Test
+    @DisplayName("Workspace members include their display name so the partner is known on any device")
+    void getCurrentUserWorkspaces_IncludesMemberNames() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
+        workspace.addMember("Maria@Example.com", WorkspaceRole.PARTNER);
+        when(workspaceAccess.currentUserEmail()).thenReturn("jorge@example.com");
+        when(workspaceRepository.findWorkspacesByUserEmail("jorge@example.com")).thenReturn(List.of(workspace));
+        when(userDirectory.getDisplayNamesByEmail(any())).thenReturn(java.util.Map.of(
+                "jorge@example.com", "Jorge Linares", "maria@example.com", "María Pérez"));
+
+        WorkspaceResponse response = workspaceApplicationService.getCurrentUserWorkspaces().get(0);
+
+        assertThat(response.getMembers())
+                .extracting(m -> m.getUserEmail() + "=" + m.getFullName())
+                .containsExactly("jorge@example.com=Jorge Linares", "maria@example.com=María Pérez");
+    }
+
+    @Test
+    @DisplayName("A couple workspace cannot get a third member with the same invitation code")
+    void joinWorkspace_CoupleAlreadyFull_Rejected() {
+        workspace.addMember("jorge@example.com", WorkspaceRole.OWNER);
+        workspace.addMember("maria@example.com", WorkspaceRole.PARTNER);
+        when(workspaceAccess.currentUserEmail()).thenReturn("intruder@example.com");
+        when(workspaceRepository.findByInvitationCode("DUAL8X")).thenReturn(Optional.of(workspace));
+
+        assertThatThrownBy(() -> workspaceApplicationService.joinWorkspace(
+                JoinWorkspaceRequest.builder().invitationCode("DUAL8X").build()))
+                .isInstanceOf(IllegalStateException.class);
+        verify(workspaceRepository, never()).save(any());
     }
 }

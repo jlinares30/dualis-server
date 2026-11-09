@@ -22,6 +22,9 @@ public class WorkspaceMemberResponse {
     @Schema(description = "User email", example = "jorge@example.com")
     private String userEmail;
 
+    @Schema(description = "Member display name (first and last name)", example = "Jorge Linares")
+    private String fullName;
+
     @Schema(description = "Workspace role (OWNER, PARTNER, VIEWER)", example = "OWNER")
     private WorkspaceRole role;
 

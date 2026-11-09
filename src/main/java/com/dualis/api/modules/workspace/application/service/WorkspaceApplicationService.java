@@ -1,6 +1,7 @@
 package com.dualis.api.modules.workspace.application.service;
 
 import com.dualis.api.exception.ResourceNotFoundException;
+import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
 import com.dualis.api.modules.workspace.application.usecase.ManageWorkspaceUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ForbiddenException;
@@ -29,6 +30,8 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
     private final WorkspaceRepositoryPort workspaceRepository;
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
+    private final ManageAuthUseCase userDirectory;
+    private static final int MAX_COUPLE_MEMBERS = 2;
     private static final String ALPHA_NUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -62,14 +65,14 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
         workspace.addMember(ownerEmail, WorkspaceRole.OWNER);
 
         Workspace saved = workspaceRepository.save(workspace);
-        return WorkspaceResponse.fromDomain(saved);
+        return toResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<WorkspaceResponse> getCurrentUserWorkspaces() {
         List<Workspace> workspaces = workspaceRepository.findWorkspacesByUserEmail(workspaceAccess.currentUserEmail());
-        return workspaces.stream().map(WorkspaceResponse::fromDomain).toList();
+        return workspaces.stream().map(this::toResponse).toList();
     }
 
     @Override
@@ -78,7 +81,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
         workspaceAccess.assertCurrentUserIsMember(id);
         Workspace workspace = workspaceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + id));
-        return WorkspaceResponse.fromDomain(workspace);
+        return toResponse(workspace);
     }
 
     @Override
@@ -90,7 +93,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
         workspace.updateDetails(request.getName(), request.getDescription(), request.getCurrency());
         Workspace updated = workspaceRepository.save(workspace);
-        return WorkspaceResponse.fromDomain(updated);
+        return toResponse(updated);
     }
 
     @Override
@@ -133,7 +136,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
         }
 
         Workspace updated = workspaceRepository.save(workspace);
-        return WorkspaceResponse.fromDomain(updated);
+        return toResponse(updated);
     }
 
     @Override
@@ -154,9 +157,14 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
             throw new IllegalArgumentException("User " + partnerEmail + " is already a member of this workspace");
         }
 
+        if (workspace.getType() == WorkspaceType.COUPLE
+                && workspace.getMembers() != null && workspace.getMembers().size() >= MAX_COUPLE_MEMBERS) {
+            throw new IllegalStateException("This couple workspace already has two members");
+        }
+
         workspace.addMember(partnerEmail, WorkspaceRole.PARTNER);
         Workspace updated = workspaceRepository.save(workspace);
-        return WorkspaceResponse.fromDomain(updated);
+        return toResponse(updated);
     }
 
     private String generateUniqueInvitationCode() {
@@ -169,5 +177,19 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
             code = sb.toString();
         } while (workspaceRepository.findByInvitationCode(code).isPresent());
         return code;
+    }
+
+    private WorkspaceResponse toResponse(Workspace workspace) {
+        WorkspaceResponse response = WorkspaceResponse.fromDomain(workspace);
+        if (response != null && response.getMembers() != null && !response.getMembers().isEmpty()) {
+            java.util.Map<String, String> names = userDirectory.getDisplayNamesByEmail(
+                    response.getMembers().stream().map(m -> m.getUserEmail()).toList());
+            response.getMembers().forEach(m -> {
+                if (m.getUserEmail() != null) {
+                    m.setFullName(names.get(m.getUserEmail().trim().toLowerCase()));
+                }
+            });
+        }
+        return response;
     }
 }
