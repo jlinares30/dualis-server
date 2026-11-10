@@ -1,6 +1,7 @@
 package com.dualis.api.modules.transaction.application.service;
 
 import com.dualis.api.modules.category.application.usecase.ManageCategoryUseCase;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import com.dualis.api.modules.category.domain.model.CategoryNature;
 import com.dualis.api.modules.settlement.application.usecase.ManageSplitRuleUseCase;
 import com.dualis.api.modules.settlement.dto.response.SplitRuleResponse;
@@ -31,7 +32,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -44,6 +45,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     private final WorkspaceRepositoryPort workspaceRepository;
     private final ManageCategoryUseCase categoryUseCase;
     private final ManageSplitRuleUseCase splitRuleUseCase;
+    private final ConvertCurrencyUseCase currencyConverter;
 
     private static final BigDecimal DEFAULT_SPLIT_PERCENTAGE = new BigDecimal("50.00");
 
@@ -64,7 +66,8 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             targetAccount = findActiveAccount(request.getTargetAccountId(), request.getWorkspaceId(), true);
         }
 
-        applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
+        BigDecimal appliedRate = applyBalanceImpact(primaryAccount, targetAccount, request.getType(),
+                request.getAmount(), request.getExchangeRate());
 
         // The transaction is always recorded in the currency of the account it moves money from,
         // which is the currency its balance impact is applied in.
@@ -84,7 +87,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 .categoryNature(nature)
                 .amount(moneyAmount)
                 .description(request.getDescription())
-                .exchangeRate(request.getExchangeRate())
+                .exchangeRate(appliedRate)
                 .originalAmount(request.getOriginalAmount())
                 .originalCurrency(request.getOriginalCurrency())
                 .splitPartnerAPercentage(splitPercentage)
@@ -159,8 +162,15 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                     !isAccountOfTransaction(request.getTargetAccountId(), transaction));
         }
 
-        // Apply new balance impact
-        applyBalanceImpact(primaryAccount, targetAccount, request.getType(), request.getAmount());
+        // Apply new balance impact. For cross-currency transfers keep the rate the user chose, or the one
+        // stored originally when the accounts did not change; otherwise the current rate is used.
+        boolean sameAccounts = Objects.equals(request.getAccountId(), transaction.getAccountId())
+                && Objects.equals(request.getTargetAccountId(), transaction.getTargetAccountId());
+        BigDecimal requestedRate = request.getExchangeRate() != null
+                ? request.getExchangeRate()
+                : (sameAccounts ? transaction.getExchangeRate() : null);
+        BigDecimal appliedRate = applyBalanceImpact(primaryAccount, targetAccount, request.getType(),
+                request.getAmount(), requestedRate);
 
         Money moneyAmount = Money.of(request.getAmount(), primaryAccount.getCurrency());
         CategoryNature nature = resolveCategoryNature(request.getCategoryNature(), request.getCategoryId());
@@ -182,6 +192,10 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 request.getTransactionDate(),
                 splitPercentage
         );
+
+        transaction.updateExchange(appliedRate,
+                appliedRate != null ? request.getAmount() : null,
+                appliedRate != null ? primaryAccount.getCurrency() : null);
 
         Transaction updated = transactionRepository.save(transaction);
         return mapToResponse(updated);
@@ -211,7 +225,7 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
             case TRANSFER -> {
                 primaryAccount.credit(amount);
                 if (targetAccount != null) {
-                    targetAccount.debit(convertCurrencyIfDifferent(amount, targetAccount.getBalance().currency()));
+                    targetAccount.debit(targetAmount(amount, targetAccount, transaction.getExchangeRate()));
                     accountRepository.save(targetAccount);
                 }
             }
@@ -219,18 +233,44 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
         accountRepository.save(primaryAccount);
     }
 
-    private void applyBalanceImpact(Account primaryAccount, Account targetAccount, TransactionType type, BigDecimal amountVal) {
-        Money amount = Money.of(amountVal, primaryAccount.getBalance() != null ? primaryAccount.getBalance().currency() : Money.DEFAULT_CURRENCY);
+    /**
+     * Applies the balance impact and returns the exchange rate used for a cross-currency transfer
+     * (null otherwise). A positive {@code requestedRate} (the rate the user actually got) wins over
+     * the reference rate.
+     */
+    private BigDecimal applyBalanceImpact(Account primaryAccount, Account targetAccount, TransactionType type,
+                                          BigDecimal amountVal, BigDecimal requestedRate) {
+        Money amount = Money.of(amountVal, primaryAccount.getCurrency());
+        BigDecimal appliedRate = null;
         switch (type) {
             case INCOME -> primaryAccount.credit(amount);
             case EXPENSE -> primaryAccount.debit(amount);
             case TRANSFER -> {
                 primaryAccount.debit(amount);
-                targetAccount.credit(convertCurrencyIfDifferent(amount, targetAccount.getBalance().currency()));
+                String targetCurrency = targetAccount.getCurrency();
+                if (!amount.currency().equalsIgnoreCase(targetCurrency)) {
+                    appliedRate = requestedRate != null && requestedRate.signum() > 0
+                            ? requestedRate
+                            : currencyConverter.rate(amount.currency(), targetCurrency);
+                }
+                targetAccount.credit(targetAmount(amount, targetAccount, appliedRate));
                 accountRepository.save(targetAccount);
             }
         }
         accountRepository.save(primaryAccount);
+        return appliedRate;
+    }
+
+    /** Amount received by the target account of a transfer, using the stored rate when available. */
+    private Money targetAmount(Money sourceAmount, Account targetAccount, BigDecimal rate) {
+        String targetCurrency = targetAccount.getCurrency();
+        if (sourceAmount.currency().equalsIgnoreCase(targetCurrency)) {
+            return Money.of(sourceAmount.amount(), targetCurrency);
+        }
+        BigDecimal converted = rate != null && rate.signum() > 0
+                ? sourceAmount.amount().multiply(rate).setScale(2, RoundingMode.HALF_UP)
+                : currencyConverter.convert(sourceAmount.amount(), sourceAmount.currency(), targetCurrency);
+        return Money.of(converted, targetCurrency);
     }
 
     private boolean isAccountOfTransaction(UUID accountId, Transaction transaction) {
@@ -320,44 +360,6 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
                 .filter(java.util.Objects::nonNull)
                 .map(p -> p.setScale(2, RoundingMode.HALF_UP))
                 .orElse(DEFAULT_SPLIT_PERCENTAGE);
-    }
-
-    private static final Map<String, Double> FX_RATES_TO_USD = Map.of(
-            "USD", 1.0,
-            "EUR", 1.08,
-            "PEN", 0.27, // 1 PEN = ~0.27 USD (3.75 PEN per USD)
-            "GBP", 1.28,
-            "MXN", 0.058,
-            "COP", 0.00025,
-            "CLP", 0.0011,
-            "ARS", 0.0011,
-            "BRL", 0.18
-    );
-
-    private Money convertCurrencyIfDifferent(Money sourceMoney, String targetCurrency) {
-        if (sourceMoney == null || sourceMoney.currency().equalsIgnoreCase(targetCurrency)) {
-            return sourceMoney;
-        }
-
-        String fromCurr = sourceMoney.currency().toUpperCase();
-        String toCurr = targetCurrency.toUpperCase();
-
-        Double fromRate = FX_RATES_TO_USD.get(fromCurr);
-        Double toRate = FX_RATES_TO_USD.get(toCurr);
-
-        if (fromRate == null || toRate == null || toRate == 0) {
-            // Fallback: if unknown exchange rate, return same numerical amount in target currency
-            return new Money(sourceMoney.amount(), toCurr);
-        }
-
-        // Amount in USD = amount * fromRate
-        // Amount in target = (amount * fromRate) / toRate
-        BigDecimal fromRateBd = BigDecimal.valueOf(fromRate);
-        BigDecimal toRateBd = BigDecimal.valueOf(toRate);
-        BigDecimal inUsd = sourceMoney.amount().multiply(fromRateBd);
-        BigDecimal convertedAmount = inUsd.divide(toRateBd, 2, RoundingMode.HALF_UP);
-
-        return new Money(convertedAmount, toCurr);
     }
 
 }

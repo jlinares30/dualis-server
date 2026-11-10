@@ -63,4 +63,11 @@ public class Transaction {
         }
         this.updatedAt = OffsetDateTime.now();
     }
+
+    /** Exchange data of a cross-currency transfer (all null for same-currency movements). */
+    public void updateExchange(BigDecimal exchangeRate, BigDecimal originalAmount, String originalCurrency) {
+        this.exchangeRate = exchangeRate;
+        this.originalAmount = originalAmount;
+        this.originalCurrency = originalCurrency;
+    }
 }

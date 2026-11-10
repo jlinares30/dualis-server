@@ -50,6 +50,10 @@ public class UpdateTransactionRequest {
     @DecimalMax(value = "100.0", message = "Split percentage cannot exceed 100")
     private BigDecimal splitPartnerAPercentage;
 
+    /** Rate actually obtained for a cross-currency transfer (1 source unit = rate target units). */
+    @DecimalMin(value = "0.000001", message = "Exchange rate must be positive")
+    private BigDecimal exchangeRate;
+
     /** Optional split rule used to resolve the percentage when splitPartnerAPercentage is omitted. */
     private UUID splitRuleId;
 }
