@@ -53,7 +53,7 @@ public class AuthApplicationService implements ManageAuthUseCase {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
-                .baseCurrency(request.getBaseCurrency() != null ? request.getBaseCurrency() : "USD")
+                .baseCurrency(request.getBaseCurrency() != null ? request.getBaseCurrency().trim().toUpperCase() : Money.DEFAULT_CURRENCY)
                 .role(UserRole.ROLE_USER)
                 .isActive(true)
                 .createdAt(OffsetDateTime.now())
@@ -132,7 +132,7 @@ public class AuthApplicationService implements ManageAuthUseCase {
         // 1. Update preferred currency if provided
         String currency = (request.getBaseCurrency() != null && !request.getBaseCurrency().isBlank())
                 ? request.getBaseCurrency().trim().toUpperCase()
-                : (user.getBaseCurrency() != null ? user.getBaseCurrency() : "USD");
+                : (user.getBaseCurrency() != null ? user.getBaseCurrency() : Money.DEFAULT_CURRENCY);
 
         user.updateProfile(user.getFirstName(), user.getLastName(), currency);
         user.completeOnboarding();

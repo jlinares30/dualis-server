@@ -73,6 +73,6 @@ public class Account {
     }
 
     public String getCurrency() {
-        return this.balance != null ? this.balance.currency() : "USD";
+        return this.balance != null ? this.balance.currency() : Money.DEFAULT_CURRENCY;
     }
 }

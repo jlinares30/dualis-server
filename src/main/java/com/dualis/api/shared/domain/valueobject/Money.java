@@ -6,7 +6,8 @@ import java.util.Objects;
 
 public record Money(BigDecimal amount, String currency) implements Comparable<Money> {
 
-    public static final String DEFAULT_CURRENCY = "USD";
+    /** Default currency of the product (Peru). Used only when no currency is provided. */
+    public static final String DEFAULT_CURRENCY = "PEN";
 
     public Money {
         Objects.requireNonNull(amount, "Amount cannot be null");

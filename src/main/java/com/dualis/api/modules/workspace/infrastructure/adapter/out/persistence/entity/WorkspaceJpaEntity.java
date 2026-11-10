@@ -1,5 +1,6 @@
 package com.dualis.api.modules.workspace.infrastructure.adapter.out.persistence.entity;
 
+import com.dualis.api.shared.domain.valueobject.Money;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -66,7 +67,7 @@ public class WorkspaceJpaEntity {
             isActive = true;
         }
         if (currency == null) {
-            currency = "USD";
+            currency = Money.DEFAULT_CURRENCY;
         }
     }
 

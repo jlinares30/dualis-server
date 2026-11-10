@@ -1,5 +1,6 @@
 package com.dualis.api.modules.auth.infrastructure.adapter.out.persistence.entity;
 
+import com.dualis.api.shared.domain.valueobject.Money;
 import com.dualis.api.modules.auth.domain.model.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -69,7 +70,7 @@ public class UserJpaEntity {
             role = UserRole.ROLE_USER;
         }
         if (baseCurrency == null) {
-            baseCurrency = "USD";
+            baseCurrency = Money.DEFAULT_CURRENCY;
         }
     }
 

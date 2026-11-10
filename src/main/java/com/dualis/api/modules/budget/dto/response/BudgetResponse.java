@@ -1,5 +1,6 @@
 package com.dualis.api.modules.budget.dto.response;
 
+import com.dualis.api.shared.domain.valueobject.Money;
 import com.dualis.api.modules.budget.domain.model.Budget;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -54,7 +55,7 @@ public class BudgetResponse {
                 .categoryId(budget.getCategoryId())
                 .name(budget.getName())
                 .amount(budget.getAmount() != null ? budget.getAmount().amount() : null)
-                .currency(budget.getAmount() != null ? budget.getAmount().currency() : "USD")
+                .currency(budget.getAmount() != null ? budget.getAmount().currency() : Money.DEFAULT_CURRENCY)
                 .periodMonth(budget.getPeriodMonth())
                 .periodYear(budget.getPeriodYear())
                 .createdAt(budget.getCreatedAt())

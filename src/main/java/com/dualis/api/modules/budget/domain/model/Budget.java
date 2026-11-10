@@ -30,7 +30,7 @@ public class Budget {
             this.categoryId = categoryId;
         }
         if (amount != null) {
-            String curr = currency != null ? currency : (this.amount != null ? this.amount.currency() : "USD");
+            String curr = currency != null ? currency : (this.amount != null ? this.amount.currency() : Money.DEFAULT_CURRENCY);
             this.amount = Money.of(amount, curr);
         }
         if (periodMonth != null) {

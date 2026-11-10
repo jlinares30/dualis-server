@@ -33,7 +33,7 @@ public class BudgetPersistenceMapper {
                 .categoryId(domain.getCategoryId())
                 .name(domain.getName())
                 .amount(domain.getAmount() != null ? domain.getAmount().amount() : null)
-                .currency(domain.getAmount() != null ? domain.getAmount().currency() : "USD")
+                .currency(domain.getAmount() != null ? domain.getAmount().currency() : Money.DEFAULT_CURRENCY)
                 .periodMonth(domain.getPeriodMonth())
                 .periodYear(domain.getPeriodYear())
                 .createdAt(domain.getCreatedAt())
