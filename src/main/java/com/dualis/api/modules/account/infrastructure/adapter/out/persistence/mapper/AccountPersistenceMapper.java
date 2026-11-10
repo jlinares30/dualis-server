@@ -21,6 +21,7 @@ public class AccountPersistenceMapper {
                 .isIncludedInTotal(Boolean.TRUE.equals(entity.getIsIncludedInTotal()))
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .version(entity.getVersion())
                 .build();
     }
 
@@ -38,6 +39,7 @@ public class AccountPersistenceMapper {
                 .isIncludedInTotal(domain.isIncludedInTotal())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
+                .version(domain.getVersion())
                 .build();
     }
 }

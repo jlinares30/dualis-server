@@ -20,6 +20,8 @@ public class Account {
     private String description;
     private boolean isIncludedInTotal;
     private final OffsetDateTime createdAt;
+    /** Optimistic locking version; null for accounts not persisted yet. */
+    private final Long version;
     private OffsetDateTime updatedAt;
 
     public void updateDetails(

@@ -117,7 +117,7 @@ class TransactionApplicationServiceTest {
                 .description("Bonus")
                 .build();
 
-        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findByIdForUpdate(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
 
         Transaction savedTx = Transaction.builder()
                 .id(UUID.randomUUID())
@@ -153,8 +153,8 @@ class TransactionApplicationServiceTest {
                 .description("Transfer")
                 .build();
 
-        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
-        when(accountRepository.findById(targetAccountId)).thenReturn(Optional.of(targetAccount));
+        when(accountRepository.findByIdForUpdate(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findByIdForUpdate(targetAccountId)).thenReturn(Optional.of(targetAccount));
 
         Transaction savedTx = Transaction.builder()
                 .id(UUID.randomUUID())
@@ -202,7 +202,7 @@ class TransactionApplicationServiceTest {
                 .currency("USD")
                 .build();
 
-        when(accountRepository.findById(foreignAccount.getId())).thenReturn(Optional.of(foreignAccount));
+        when(accountRepository.findByIdForUpdate(foreignAccount.getId())).thenReturn(Optional.of(foreignAccount));
         when(workspaceAccess.currentUserEmail()).thenReturn("maria@example.com");
         when(workspaceAccess.isMember(foreignWorkspaceId, "maria@example.com")).thenReturn(false);
 
@@ -246,7 +246,7 @@ class TransactionApplicationServiceTest {
                 .currency("PEN") // wrong currency sent by the client: the account is in USD
                 .build();
 
-        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findByIdForUpdate(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
         when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(couple));
         when(categoryUseCase.getCategoryById(categoryId)).thenReturn(
                 CategoryResponse.builder().id(categoryId).categoryNature(CategoryNature.ESSENTIAL).build());
@@ -273,7 +273,7 @@ class TransactionApplicationServiceTest {
                 .createdAt(OffsetDateTime.now())
                 .build();
         when(transactionRepository.findById(txId)).thenReturn(Optional.of(legacy));
-        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findByIdForUpdate(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
 
         transactionApplicationService.deleteTransaction(txId);
 
@@ -295,8 +295,8 @@ class TransactionApplicationServiceTest {
                 .amount(new BigDecimal("100.00"))
                 .exchangeRate(new BigDecimal("3.70"))  // the rate the user actually got at the bank
                 .build();
-        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
-        when(accountRepository.findById(penAccount.getId())).thenReturn(Optional.of(penAccount));
+        when(accountRepository.findByIdForUpdate(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findByIdForUpdate(penAccount.getId())).thenReturn(Optional.of(penAccount));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TransactionResponse created = transactionApplicationService.createTransaction(request);

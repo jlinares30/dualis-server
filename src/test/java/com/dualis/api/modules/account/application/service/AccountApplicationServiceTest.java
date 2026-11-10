@@ -93,20 +93,20 @@ class AccountApplicationServiceTest {
                 .type(AccountType.SAVINGS)
                 .build();
 
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdForUpdate(accountId)).thenReturn(Optional.of(account));
         when(accountRepository.save(any(Account.class))).thenReturn(account);
 
         AccountResponse response = accountApplicationService.updateAccount(accountId, request);
 
         assertThat(response).isNotNull();
-        verify(accountRepository, times(1)).findById(accountId);
+        verify(accountRepository, times(1)).findByIdForUpdate(accountId);
         verify(accountRepository, times(1)).save(account);
     }
 
     @Test
     @DisplayName("Should archive account")
     void archiveAccount_Success() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdForUpdate(accountId)).thenReturn(Optional.of(account));
         when(accountRepository.save(any(Account.class))).thenReturn(account);
 
         accountApplicationService.archiveAccount(accountId);

@@ -10,6 +10,9 @@ import java.util.UUID;
 public interface AccountRepositoryPort {
     Account save(Account account);
     Optional<Account> findById(UUID id);
+
+    /** Loads the account locking it until the current transaction ends; use before changing its balance. */
+    Optional<Account> findByIdForUpdate(UUID id);
     List<Account> findByWorkspaceId(UUID workspaceId);
     List<Account> findByWorkspaceIdAndStatus(UUID workspaceId, AccountStatus status);
 }

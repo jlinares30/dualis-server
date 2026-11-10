@@ -50,6 +50,11 @@ public class AccountJpaEntity {
     @Builder.Default
     private Boolean isIncludedInTotal = true;
 
+    /** Prevents lost updates on the balance (e.g. editing the account while a movement changes it). */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

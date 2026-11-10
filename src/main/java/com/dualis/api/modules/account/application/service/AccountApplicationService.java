@@ -54,7 +54,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     @Override
     @Transactional
     public AccountResponse updateAccount(UUID id, UpdateAccountRequest request) {
-        Account account = accountRepository.findById(id)
+        Account account = accountRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + id));
         workspaceAccess.assertCurrentUserIsMember(account.getWorkspaceId());
 
@@ -95,7 +95,7 @@ public class AccountApplicationService implements ManageAccountUseCase {
     @Override
     @Transactional
     public void archiveAccount(UUID id) {
-        Account account = accountRepository.findById(id)
+        Account account = accountRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + id));
         workspaceAccess.assertCurrentUserIsMember(account.getWorkspaceId());
         account.archive();

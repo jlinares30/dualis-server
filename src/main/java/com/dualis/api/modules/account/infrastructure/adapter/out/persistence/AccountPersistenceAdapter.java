@@ -33,6 +33,11 @@ public class AccountPersistenceAdapter implements AccountRepositoryPort {
     }
 
     @Override
+    public Optional<Account> findByIdForUpdate(UUID id) {
+        return springDataAccountRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public List<Account> findByWorkspaceId(UUID workspaceId) {
         return springDataAccountRepository.findByWorkspaceId(workspaceId).stream()
                 .map(mapper::toDomain)

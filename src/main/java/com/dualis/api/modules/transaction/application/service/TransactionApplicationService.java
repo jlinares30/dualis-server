@@ -314,7 +314,9 @@ public class TransactionApplicationService implements ManageTransactionUseCase {
     }
 
     private Account findAccountById(UUID accountId) {
-        return accountRepository.findById(accountId)
+        // Every path through here changes the balance: lock the row so concurrent movements
+        // on the same account (e.g. both partners at once) are applied one after the other.
+        return accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + accountId));
     }
 
