@@ -1,8 +1,6 @@
 package com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence;
 
-import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.entity.AccountJpaEntity;
-import com.dualis.api.modules.account.infrastructure.adapter.out.persistence.repository.SpringDataAccountRepository;
 import com.dualis.api.modules.transaction.domain.model.Transaction;
 import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
@@ -10,6 +8,8 @@ import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence
 import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.mapper.TransactionPersistenceMapper;
 import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.repository.SpringDataTransactionRepository;
 import com.dualis.api.modules.transaction.infrastructure.adapter.out.persistence.specification.TransactionSpecification;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,19 +26,18 @@ import java.util.UUID;
 public class TransactionPersistenceAdapter implements TransactionRepositoryPort {
 
     private final SpringDataTransactionRepository transactionRepository;
-    private final SpringDataAccountRepository accountRepository;
+    /** Account rows are referenced by id only; the account module owns their persistence. */
+    @PersistenceContext
+    private EntityManager entityManager;
     private final TransactionPersistenceMapper mapper;
 
     @Override
     public Transaction save(Transaction transaction) {
-        AccountJpaEntity primaryAccount = accountRepository.findById(transaction.getAccountId())
-                .orElseThrow(() -> new ResourceNotFoundException("Account not found with id: " + transaction.getAccountId()));
-
-        AccountJpaEntity targetAccount = null;
-        if (transaction.getTargetAccountId() != null) {
-            targetAccount = accountRepository.findById(transaction.getTargetAccountId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Target account not found with id: " + transaction.getTargetAccountId()));
-        }
+        // The application service already validated both accounts; only a reference is needed here.
+        AccountJpaEntity primaryAccount = entityManager.getReference(AccountJpaEntity.class, transaction.getAccountId());
+        AccountJpaEntity targetAccount = transaction.getTargetAccountId() != null
+                ? entityManager.getReference(AccountJpaEntity.class, transaction.getTargetAccountId())
+                : null;
 
         TransactionJpaEntity entity = mapper.toEntity(transaction, primaryAccount, targetAccount);
         TransactionJpaEntity saved = transactionRepository.save(entity);

@@ -1,7 +1,7 @@
 package com.dualis.api.modules.workspace.application.service;
 
 import com.dualis.api.exception.ResourceNotFoundException;
-import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
+import com.dualis.api.modules.auth.application.usecase.UserDirectoryUseCase;
 import com.dualis.api.modules.workspace.application.usecase.ManageWorkspaceUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ForbiddenException;
@@ -30,7 +30,7 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
     private final WorkspaceRepositoryPort workspaceRepository;
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
-    private final ManageAuthUseCase userDirectory;
+    private final UserDirectoryUseCase userDirectory;
     private static final int MAX_COUPLE_MEMBERS = 2;
     private static final String ALPHA_NUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();

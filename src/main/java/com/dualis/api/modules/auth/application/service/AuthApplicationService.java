@@ -20,24 +20,23 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import com.dualis.api.modules.account.domain.model.Account;
-import com.dualis.api.modules.account.domain.model.AccountStatus;
+import com.dualis.api.modules.account.application.usecase.ManageAccountUseCase;
 import com.dualis.api.modules.account.domain.model.AccountType;
-import com.dualis.api.modules.account.domain.repository.AccountRepositoryPort;
-import com.dualis.api.modules.auth.dto.request.OnboardingRequest;
-import com.dualis.api.modules.workspace.domain.model.Workspace;
-import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
-import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
-import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
+import com.dualis.api.modules.account.dto.request.CreateAccountRequest;
+import com.dualis.api.modules.workspace.application.usecase.ManageWorkspaceUseCase;
+import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
+import com.dualis.api.modules.workspace.dto.response.WorkspaceResponse;
 import com.dualis.api.shared.domain.valueobject.Money;
+import com.dualis.api.modules.auth.dto.request.OnboardingRequest;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 
 @Service
 @RequiredArgsConstructor
 public class AuthApplicationService implements ManageAuthUseCase {
 
     private final UserRepositoryPort userRepository;
-    private final WorkspaceRepositoryPort workspaceRepository;
-    private final AccountRepositoryPort accountRepository;
+    private final ManageWorkspaceUseCase workspaceUseCase;
+    private final ManageAccountUseCase accountUseCase;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptService loginAttempts;
@@ -146,56 +145,22 @@ public class AuthApplicationService implements ManageAuthUseCase {
         user.completeOnboarding();
         User updatedUser = userRepository.save(user);
 
-        // 2. Ensure individual or couple workspace exists for the user
-        List<Workspace> userWorkspaces = workspaceRepository.findWorkspacesByUserEmail(email);
-        Workspace targetWorkspace = null;
-
+        // 2. Ensure the requested workspace exists. Workspaces and accounts are created through their
+        //    own modules' use cases (the owner is always the authenticated user).
         boolean wantsCouple = "COUPLE".equalsIgnoreCase(request.getWorkspaceMode());
-
-        if (wantsCouple) {
-            targetWorkspace = userWorkspaces.stream()
-                    .filter(w -> w.getType() == WorkspaceType.COUPLE)
-                    .findFirst()
-                    .orElse(null);
-
-            if (targetWorkspace == null) {
-                targetWorkspace = Workspace.builder()
-                        .name("Espacio en Pareja")
-                        .description("Finanzas compartidas")
-                        .type(WorkspaceType.COUPLE)
+        WorkspaceType targetType = wantsCouple ? WorkspaceType.COUPLE : WorkspaceType.INDIVIDUAL;
+        UUID targetWorkspaceId = workspaceUseCase.getCurrentUserWorkspaces().stream()
+                .filter(w -> w.getType() == targetType)
+                .map(WorkspaceResponse::getId)
+                .findFirst()
+                .orElseGet(() -> workspaceUseCase.createWorkspace(CreateWorkspaceRequest.builder()
+                        .name(wantsCouple ? "Espacio en Pareja" : "Espacio Personal")
+                        .description(wantsCouple ? "Finanzas compartidas" : "Finanzas personales")
+                        .type(targetType)
                         .currency(currency)
-                        .ownerEmail(email)
-                        .isActive(true)
-                        .createdAt(OffsetDateTime.now())
-                        .updatedAt(OffsetDateTime.now())
-                        .build();
-                targetWorkspace.addMember(email, WorkspaceRole.OWNER);
-                if (request.getPartnerEmail() != null && !request.getPartnerEmail().isBlank()) {
-                    targetWorkspace.addMember(request.getPartnerEmail().trim().toLowerCase(), WorkspaceRole.PARTNER);
-                }
-                targetWorkspace = workspaceRepository.save(targetWorkspace);
-            }
-        } else {
-            targetWorkspace = userWorkspaces.stream()
-                    .filter(w -> w.getType() == WorkspaceType.INDIVIDUAL)
-                    .findFirst()
-                    .orElse(null);
-
-            if (targetWorkspace == null) {
-                targetWorkspace = Workspace.builder()
-                        .name("Espacio Personal")
-                        .description("Finanzas personales")
-                        .type(WorkspaceType.INDIVIDUAL)
-                        .currency(currency)
-                        .ownerEmail(email)
-                        .isActive(true)
-                        .createdAt(OffsetDateTime.now())
-                        .updatedAt(OffsetDateTime.now())
-                        .build();
-                targetWorkspace.addMember(email, WorkspaceRole.OWNER);
-                targetWorkspace = workspaceRepository.save(targetWorkspace);
-            }
-        }
+                        .build()).getId());
+        // A partner is never added from here: they must accept by joining with the invitation code
+        // of the couple workspace (request.partnerEmail is ignored).
 
         // 3. Create initial financial account if specified
         if (request.getAccountName() != null && !request.getAccountName().isBlank()) {
@@ -205,47 +170,18 @@ public class AuthApplicationService implements ManageAuthUseCase {
             } catch (Exception e) {
                 accountType = AccountType.SAVINGS;
             }
-
-            java.math.BigDecimal startBal = request.getInitialBalance() != null ? request.getInitialBalance() : java.math.BigDecimal.ZERO;
-
-            Account initialAccount = Account.builder()
-                    .workspaceId(targetWorkspace.getId())
+            accountUseCase.createAccount(CreateAccountRequest.builder()
+                    .workspaceId(targetWorkspaceId)
                     .name(request.getAccountName().trim())
                     .type(accountType)
-                    .balance(Money.of(startBal, currency))
-                    .status(AccountStatus.ACTIVE)
-                    .isIncludedInTotal(true)
+                    .balance(request.getInitialBalance() != null ? request.getInitialBalance() : java.math.BigDecimal.ZERO)
+                    .currency(currency)
                     .description("Cuenta inicial configurada en el onboarding")
-                    .createdAt(OffsetDateTime.now())
-                    .updatedAt(OffsetDateTime.now())
-                    .build();
-
-            accountRepository.save(initialAccount);
+                    .isIncludedInTotal(true)
+                    .build());
         }
 
         return UserProfileResponse.fromDomain(updatedUser);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public java.util.Map<String, String> getDisplayNamesByEmail(java.util.Collection<String> emails) {
-        java.util.Map<String, String> names = new java.util.HashMap<>();
-        if (emails == null) {
-            return names;
-        }
-        for (String email : emails) {
-            if (email == null || email.isBlank()) continue;
-            String key = email.trim().toLowerCase();
-            if (names.containsKey(key)) continue;
-            userRepository.findByEmailIgnoreCase(key).ifPresent(u -> {
-                String full = ((u.getFirstName() != null ? u.getFirstName() : "") + " "
-                        + (u.getLastName() != null ? u.getLastName() : "")).trim();
-                if (!full.isBlank()) {
-                    names.put(key, full);
-                }
-            });
-        }
-        return names;
     }
 
     @Override

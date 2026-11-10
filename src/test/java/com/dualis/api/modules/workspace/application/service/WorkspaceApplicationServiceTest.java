@@ -3,7 +3,7 @@ package com.dualis.api.modules.workspace.application.service;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
-import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
+import com.dualis.api.modules.auth.application.usecase.UserDirectoryUseCase;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 import com.dualis.api.modules.workspace.dto.request.CreateWorkspaceRequest;
@@ -43,7 +43,7 @@ class WorkspaceApplicationServiceTest {
     private VerifyWorkspaceAccessUseCase workspaceAccess;
 
     @Mock
-    private ManageAuthUseCase userDirectory;
+    private UserDirectoryUseCase userDirectory;
 
     @InjectMocks
     private WorkspaceApplicationService workspaceApplicationService;
