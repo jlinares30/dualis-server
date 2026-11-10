@@ -26,6 +26,8 @@ import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 
 @Service
@@ -82,7 +84,13 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
         } else {
             list = budgetRepository.findByWorkspaceId(workspaceId);
         }
-        return list.stream().map(b -> getBudgetProgress(b.getId())).toList();
+        // One expense query per month instead of one lookup + query per budget.
+        Map<YearMonth, List<Transaction>> expensesByMonth = new HashMap<>();
+        return list.stream()
+                .map(b -> buildProgress(b, expensesByMonth.computeIfAbsent(
+                        YearMonth.of(b.getPeriodYear(), b.getPeriodMonth()),
+                        ym -> monthExpenses(workspaceId, ym, null))))
+                .toList();
     }
 
     @Override
@@ -120,23 +128,21 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
         Budget budget = budgetRepository.findById(budgetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget not found with id: " + budgetId));
         workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
-
         YearMonth ym = YearMonth.of(budget.getPeriodYear(), budget.getPeriodMonth());
-        OffsetDateTime startDate = MonthPeriod.start(ym, timezone);
-        OffsetDateTime endDate = MonthPeriod.end(ym, timezone);
+        return buildProgress(budget, monthExpenses(budget.getWorkspaceId(), ym, budget.getCategoryId()));
+    }
+
+    private List<Transaction> monthExpenses(UUID workspaceId, YearMonth ym, UUID categoryId) {
+        return transactionRepository.findTransactions(
+                workspaceId, null, TransactionType.EXPENSE, categoryId,
+                MonthPeriod.start(ym, timezone), MonthPeriod.end(ym, timezone), null);
+    }
+
+    /** Progress of a budget given the workspace expenses of its month (filtered here by category). */
+    private BudgetProgressResponse buildProgress(Budget budget, List<Transaction> monthExpenses) {
         String budgetCurrency = budget.getAmount() != null ? budget.getAmount().currency() : Money.DEFAULT_CURRENCY;
-
-        List<Transaction> expenses = transactionRepository.findTransactions(
-                budget.getWorkspaceId(),
-                null,
-                TransactionType.EXPENSE,
-                budget.getCategoryId(),
-                startDate,
-                endDate,
-                null
-        );
-
-        BigDecimal spentAmount = expenses.stream()
+        BigDecimal spentAmount = monthExpenses.stream()
+                .filter(t -> budget.getCategoryId() == null || budget.getCategoryId().equals(t.getCategoryId()))
                 .map(t -> t.getAmount() != null
                         ? currencyConverter.convert(t.getAmount().amount(), t.getAmount().currency(), budgetCurrency)
                         : BigDecimal.ZERO)
