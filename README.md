@@ -316,7 +316,17 @@ The project contains comprehensive unit and integration tests covering all servi
 - Service Unit Tests: `AccountServiceImplTest`, `TransactionServiceImplTest`, `SplitRuleServiceImplTest`, `BudgetServiceImplTest`, `CategoryServiceImplTest`, `WorkspaceServiceImplTest`, `SettlementServiceImplTest`, `DashboardServiceImplTest`, `AuthServiceImplTest`, `SyncServiceImplTest`.
 - Controller Integration Tests: `AccountControllerTest`, `TransactionControllerTest`, `SplitRuleControllerTest`, `BudgetControllerTest`, `CategoryControllerTest`, `WorkspaceControllerTest`, `SettlementControllerTest`, `DashboardControllerTest`, `AuthControllerTest`, `SyncControllerTest`.
 
-Run tests via command line:
+- Integration Tests (`ApiIntegrationTest`, `DualisApiApplicationTests`): boot the full application against a real PostgreSQL, run every Flyway migration, validate the schema against the JPA entities and exercise the main API flows through the real security filter chain. They run only when `DB_URL` is set.
+
+Run unit tests (no database needed; integration tests are skipped):
 ```bash
 ./mvnw test
 ```
+
+Run everything, including integration tests, against the local Docker PostgreSQL:
+```bash
+docker compose up -d postgres-db
+DB_URL=jdbc:postgresql://localhost:5432/dualis_db DB_USERNAME=postgres DB_PASSWORD=secretpassword ./mvnw verify
+```
+
+CI (`.github/workflows/ci.yml`) runs `./mvnw verify` with a PostgreSQL 16 service on every pull request and branch push.
