@@ -182,4 +182,13 @@ class ApiIntegrationTest {
         assertThat(balance(jorge, usd)).isEqualByComparingTo("500.00");
         assertThat(balance(jorge, pen)).isEqualByComparingTo("0.00");
     }
+
+    @Test
+    @DisplayName("The offline sync API is disabled by default")
+    void syncDisabledByDefault() throws Exception {
+        String jorge = register("jorge");
+        String ws = createWorkspace(jorge, "INDIVIDUAL");
+        call(post("/api/v1/sync/pull"), jorge, java.util.Map.of("workspaceId", ws), 404);
+        call(post("/api/v1/sync/push"), jorge, java.util.Map.of("workspaceId", ws), 404);
+    }
 }

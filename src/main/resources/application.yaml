@@ -27,6 +27,10 @@ spring:
     locations: classpath:db/migration
 
 app:
+  # Offline sync API (/api/v1/sync) for the future mobile app. Keep disabled until it is
+  # finished (see docs/SYNC.md): pushes are not idempotent and deletions are not propagated.
+  sync:
+    enabled: ${APP_SYNC_ENABLED:false}
   # Time zone that defines "the current month" (monthly bills, periods).
   timezone: ${APP_TIMEZONE:America/Lima}
   jwt:

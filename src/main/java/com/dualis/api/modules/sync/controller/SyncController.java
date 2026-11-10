@@ -13,9 +13,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Offline sync API for the future mobile app. Disabled by default (app.sync.enabled=false) because it is
+ * not production-ready yet: pushes are not idempotent and deletions are not propagated.
+ * See docs/SYNC.md before enabling it.
+ */
+@ConditionalOnProperty(name = "app.sync.enabled", havingValue = "true")
 @RestController
 @RequestMapping("/api/v1/sync")
 @RequiredArgsConstructor
