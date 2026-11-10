@@ -1,16 +1,27 @@
 name: Wake Dualis Backend
 
+# Render's free plan puts the service to sleep after ~15 minutes without traffic, and the first
+# request then takes ~50 s (long enough for the web app's proxy to fail). This keeps it awake
+# during the hours people use the app (06:00-23:59 Lima, UTC-5) and lets the app or anyone wake
+# it on demand. Note: GitHub may delay scheduled runs and disables them after 60 days without
+# repository activity.
+
 on:
   repository_dispatch:
-    types: [wake-dualis]       
+    types: [wake-dualis]
   schedule:
-    - cron: '45 13 * * 1-6'     # respaldo: 8:45 hora Lima
-  workflow_dispatch:            # para ejecutarlo a mano desde la pestaña Actions
+    - cron: '*/14 11-23 * * *'   # 06:00-18:59 Lima
+    - cron: '*/14 0-4 * * *'     # 19:00-23:59 Lima
+  workflow_dispatch:
+
+concurrency:
+  group: wake-backend
+  cancel-in-progress: false
 
 jobs:
   wake-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
 
     steps:
       - name: Wake Render Backend
@@ -20,7 +31,7 @@ jobs:
 
           for attempt in 1 2 3 4 5; do
             echo "Intento $attempt de despertar Dualis"
-            HTTP_CODE=$(curl -L -s -o /dev/null --max-time 120 -w "%{http_code}" "$URL") || true
+            HTTP_CODE=$(curl -L -s -o /dev/null --max-time 90 -w "%{http_code}" "$URL") || true
 
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Dualis está activo"
