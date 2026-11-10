@@ -1,5 +1,8 @@
 package com.dualis.api.modules.transaction.application.service;
 
+import org.mockito.Spy;
+import com.dualis.api.modules.exchangerate.application.service.ExchangeRateApplicationService;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import java.util.List;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
 import com.dualis.api.modules.workspace.domain.model.Workspace;
@@ -61,6 +64,10 @@ class TransactionApplicationServiceTest {
 
     @Mock
     private ManageSplitRuleUseCase splitRuleUseCase;
+
+    /** Real converter with the provider disabled: uses the built-in reference rates (PEN 3.75 per USD). */
+    @Spy
+    private ConvertCurrencyUseCase currencyConverter = new ExchangeRateApplicationService(java.util.Optional::empty);
 
     @InjectMocks
     private TransactionApplicationService transactionApplicationService;
@@ -272,5 +279,41 @@ class TransactionApplicationServiceTest {
 
         assertThat(primaryAccount.getBalance().amount()).isEqualByComparingTo("530.00");
         verify(transactionRepository).delete(txId);
+    }
+
+    @Test
+    @DisplayName("Cross-currency transfer honors the user's rate and deleting it reverts with the same stored rate")
+    void transfer_CrossCurrency_UsesAndRevertsStoredRate() {
+        Account penAccount = Account.builder().id(UUID.randomUUID()).workspaceId(workspaceId).name("Soles")
+                .type(AccountType.BANK).balance(Money.of(new BigDecimal("0.00"), "PEN"))
+                .status(AccountStatus.ACTIVE).createdAt(OffsetDateTime.now()).build();
+        CreateTransactionRequest request = CreateTransactionRequest.builder()
+                .workspaceId(workspaceId)
+                .accountId(primaryAccountId)          // 500 USD
+                .targetAccountId(penAccount.getId())
+                .type(TransactionType.TRANSFER)
+                .amount(new BigDecimal("100.00"))
+                .exchangeRate(new BigDecimal("3.70"))  // the rate the user actually got at the bank
+                .build();
+        when(accountRepository.findById(primaryAccountId)).thenReturn(Optional.of(primaryAccount));
+        when(accountRepository.findById(penAccount.getId())).thenReturn(Optional.of(penAccount));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TransactionResponse created = transactionApplicationService.createTransaction(request);
+
+        assertThat(created.getExchangeRate()).isEqualByComparingTo("3.70");
+        assertThat(primaryAccount.getBalance().amount()).isEqualByComparingTo("400.00");
+        assertThat(penAccount.getBalance().amount()).isEqualByComparingTo("370.00");
+
+        Transaction stored = Transaction.builder().id(UUID.randomUUID()).workspaceId(workspaceId)
+                .accountId(primaryAccountId).targetAccountId(penAccount.getId()).type(TransactionType.TRANSFER)
+                .amount(Money.of(new BigDecimal("100.00"), "USD")).exchangeRate(new BigDecimal("3.70"))
+                .createdAt(OffsetDateTime.now()).build();
+        when(transactionRepository.findById(stored.getId())).thenReturn(Optional.of(stored));
+
+        transactionApplicationService.deleteTransaction(stored.getId());
+
+        assertThat(primaryAccount.getBalance().amount()).isEqualByComparingTo("500.00");
+        assertThat(penAccount.getBalance().amount()).isEqualByComparingTo("0.00");
     }
 }

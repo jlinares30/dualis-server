@@ -1,5 +1,8 @@
 package com.dualis.api.modules.budget.application.service;
 
+import org.springframework.beans.factory.annotation.Value;
+import com.dualis.api.shared.time.MonthPeriod;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ResourceNotFoundException;
 import com.dualis.api.modules.budget.application.usecase.ManageBudgetUseCase;
@@ -22,7 +25,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +35,10 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final BudgetRepositoryPort budgetRepository;
     private final TransactionRepositoryPort transactionRepository;
+    private final ConvertCurrencyUseCase currencyConverter;
+
+    @Value("${app.timezone:America/Lima}")
+    private String timezone = MonthPeriod.DEFAULT_ZONE;
 
     @Override
     @Transactional
@@ -55,7 +61,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
                 .workspaceId(request.getWorkspaceId())
                 .categoryId(request.getCategoryId())
                 .name(request.getName())
-                .amount(Money.of(request.getAmount(), request.getCurrency()))
+                .amount(Money.of(request.getAmount(), request.getCurrency() != null ? request.getCurrency().toUpperCase() : Money.DEFAULT_CURRENCY))
                 .periodMonth(request.getPeriodMonth())
                 .periodYear(request.getPeriodYear())
                 .createdAt(OffsetDateTime.now())
@@ -99,7 +105,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
                 request.getName(),
                 null,
                 request.getAmount(),
-                budget.getAmount() != null ? budget.getAmount().currency() : "USD",
+                budget.getAmount() != null ? budget.getAmount().currency() : Money.DEFAULT_CURRENCY,
                 request.getPeriodMonth(),
                 request.getPeriodYear()
         );
@@ -116,8 +122,9 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
         workspaceAccess.assertCurrentUserIsMember(budget.getWorkspaceId());
 
         YearMonth ym = YearMonth.of(budget.getPeriodYear(), budget.getPeriodMonth());
-        OffsetDateTime startDate = ym.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-        OffsetDateTime endDate = ym.atEndOfMonth().atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
+        OffsetDateTime startDate = MonthPeriod.start(ym, timezone);
+        OffsetDateTime endDate = MonthPeriod.end(ym, timezone);
+        String budgetCurrency = budget.getAmount() != null ? budget.getAmount().currency() : Money.DEFAULT_CURRENCY;
 
         List<Transaction> expenses = transactionRepository.findTransactions(
                 budget.getWorkspaceId(),
@@ -130,7 +137,9 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
         );
 
         BigDecimal spentAmount = expenses.stream()
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
+                .map(t -> t.getAmount() != null
+                        ? currencyConverter.convert(t.getAmount().amount(), t.getAmount().currency(), budgetCurrency)
+                        : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal limitAmount = budget.getAmount() != null ? budget.getAmount().amount() : BigDecimal.ZERO;
@@ -161,7 +170,7 @@ public class BudgetApplicationService implements ManageBudgetUseCase {
                 .spentAmount(spentAmount)
                 .remainingAmount(remainingAmount)
                 .spentPercentage(spentPercentage)
-                .currency(budget.getAmount() != null ? budget.getAmount().currency() : "USD")
+                .currency(budget.getAmount() != null ? budget.getAmount().currency() : Money.DEFAULT_CURRENCY)
                 .periodMonth(budget.getPeriodMonth())
                 .periodYear(budget.getPeriodYear())
                 .status(status)

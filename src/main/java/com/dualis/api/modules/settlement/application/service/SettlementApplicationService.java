@@ -1,5 +1,6 @@
 package com.dualis.api.modules.settlement.application.service;
 
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.exception.ForbiddenException;
 import com.dualis.api.exception.ResourceNotFoundException;
@@ -45,6 +46,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
     private final TransactionRepositoryPort transactionRepository;
     private final WorkspaceRepositoryPort workspaceRepository;
     private final AccountRepositoryPort accountRepository;
+    private final ConvertCurrencyUseCase currencyConverter;
 
     @Override
     @Transactional(readOnly = true)
@@ -53,7 +55,7 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with id: " + workspaceId));
 
-        // All figures are expressed in the workspace currency (multi-currency conversion is handled separately).
+        // All figures are converted to the workspace currency.
         String currency = workspace.getCurrency() != null ? workspace.getCurrency() : Money.DEFAULT_CURRENCY;
 
         String partnerAEmail = workspace.getOwnerEmail();
@@ -79,7 +81,9 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
         BigDecimal partnerBPaidVal = BigDecimal.ZERO;
 
         for (Transaction expense : expenses) {
-            BigDecimal amount = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
+            BigDecimal amount = expense.getAmount() != null
+                    ? currencyConverter.convert(expense.getAmount().amount(), expense.getAmount().currency(), currency)
+                    : BigDecimal.ZERO;
             BigDecimal pctA = expense.getSplitPartnerAPercentage() != null
                     ? expense.getSplitPartnerAPercentage()
                     : fallbackPercentageA;
@@ -108,7 +112,9 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
         // money paid by A to B increases A's position; money paid by B to A decreases it.
         BigDecimal totalSettledVal = BigDecimal.ZERO;
         for (Settlement s : settlementRepository.findByWorkspaceIdAndStatus(workspaceId, SettlementStatus.COMPLETED)) {
-            BigDecimal amt = s.getAmount() != null ? s.getAmount().amount() : BigDecimal.ZERO;
+            BigDecimal amt = s.getAmount() != null
+                    ? currencyConverter.convert(s.getAmount().amount(), s.getAmount().currency(), currency)
+                    : BigDecimal.ZERO;
             totalSettledVal = totalSettledVal.add(amt);
             if (s.getPayerEmail() != null && s.getPayerEmail().equalsIgnoreCase(partnerAEmail)) {
                 netA = netA.add(amt);
@@ -176,7 +182,10 @@ public class SettlementApplicationService implements ManageSettlementUseCase {
         if (!currentUser.equalsIgnoreCase(request.getPayerEmail()) && !currentUser.equalsIgnoreCase(request.getRecipientEmail())) {
             throw new ForbiddenException("You can only register settlements in which you are the payer or the recipient");
         }
-        Money amount = Money.of(request.getAmount(), request.getCurrency());
+        String settlementCurrency = request.getCurrency() != null
+                ? request.getCurrency().toUpperCase()
+                : workspaceRepository.findById(request.getWorkspaceId()).map(Workspace::getCurrency).orElse(Money.DEFAULT_CURRENCY);
+        Money amount = Money.of(request.getAmount(), settlementCurrency);
 
         Settlement settlement = Settlement.builder()
                 .workspaceId(request.getWorkspaceId())

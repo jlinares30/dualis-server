@@ -17,7 +17,12 @@ import com.dualis.api.modules.transaction.domain.model.TransactionType;
 import com.dualis.api.modules.transaction.domain.repository.TransactionRepositoryPort;
 import com.dualis.api.modules.workspace.domain.model.Workspace;
 import com.dualis.api.modules.workspace.domain.repository.WorkspaceRepositoryPort;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.shared.domain.valueobject.Money;
+import com.dualis.api.shared.time.MonthPeriod;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +30,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,42 +43,56 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase {
     private final CategoryRepositoryPort categoryRepository;
     private final BudgetRepositoryPort budgetRepository;
     private final WorkspaceRepositoryPort workspaceRepository;
+    private final ConvertCurrencyUseCase currencyConverter;
+
+    @Value("${app.timezone:America/Lima}")
+    private String timezone = MonthPeriod.DEFAULT_ZONE;
 
     @Override
     @Transactional(readOnly = true)
     public DashboardSummaryResponse getDashboardSummary(UUID workspaceId, Integer month, Integer year) {
         workspaceAccess.assertCurrentUserIsMember(workspaceId);
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        int periodMonth = (month != null) ? month : now.getMonthValue();
-        int periodYear = (year != null) ? year : now.getYear();
-        int lastDay = YearMonth.of(periodYear, periodMonth).lengthOfMonth();
-
-        OffsetDateTime startDate = OffsetDateTime.of(periodYear, periodMonth, 1, 0, 0, 0, 0, ZoneOffset.UTC);
-        OffsetDateTime endDate = OffsetDateTime.of(periodYear, periodMonth, lastDay, 23, 59, 59, 999999999, ZoneOffset.UTC);
-
-        // 1. Total Liquidity / Balance across active accounts
-        List<Account> activeAccounts = accountRepository.findByWorkspaceIdAndStatus(workspaceId, AccountStatus.ACTIVE);
-        BigDecimal totalBalance = activeAccounts.stream()
-                .map(a -> a.getBalance() != null ? a.getBalance().amount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        YearMonth current = MonthPeriod.current(timezone);
+        int periodMonth = (month != null) ? month : current.getMonthValue();
+        int periodYear = (year != null) ? year : current.getYear();
+        YearMonth period = YearMonth.of(periodYear, periodMonth);
+        OffsetDateTime startDate = MonthPeriod.start(period, timezone);
+        OffsetDateTime endDate = MonthPeriod.end(period, timezone);
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        String currency = workspace != null && workspace.getCurrency() != null ? workspace.getCurrency() : (!activeAccounts.isEmpty() && activeAccounts.get(0).getBalance() != null ? activeAccounts.get(0).getBalance().currency() : "USD");
+        List<Account> workspaceAccounts = accountRepository.findByWorkspaceId(workspaceId);
+        List<Account> activeAccounts = workspaceAccounts.stream()
+                .filter(a -> a.getStatus() == AccountStatus.ACTIVE)
+                .toList();
+        String currency = workspace != null && workspace.getCurrency() != null
+                ? workspace.getCurrency()
+                : (!activeAccounts.isEmpty() ? activeAccounts.get(0).getCurrency() : Money.DEFAULT_CURRENCY);
 
-        // 2. Income & Expense Cash Flow
-        List<Transaction> incomeTransactions = transactionRepository.findTransactions(
-                workspaceId, null, TransactionType.INCOME, null, startDate, endDate, null
-        );
-        BigDecimal monthlyIncome = incomeTransactions.stream()
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
+        // 1. Total Liquidity: active accounts flagged "included in total", converted to the workspace currency
+        BigDecimal totalBalance = activeAccounts.stream()
+                .filter(Account::isIncludedInTotal)
+                .map(a -> a.getBalance() != null
+                        ? currencyConverter.convert(a.getBalance().amount(), a.getCurrency(), currency)
+                        : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<Transaction> expenseTransactions = transactionRepository.findTransactions(
-                workspaceId, null, TransactionType.EXPENSE, null, startDate, endDate, null
-        );
-        BigDecimal monthlyExpenses = expenseTransactions.stream()
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 2. Income & Expense Cash Flow. A personal workspace also includes movements of its accounts
+        //    recorded in the couple workspace (e.g. shared expenses paid with a personal account).
+        boolean personal = workspace != null && workspace.getType() == WorkspaceType.INDIVIDUAL;
+        List<UUID> ownAccountIds = personal ? workspaceAccounts.stream().map(Account::getId).toList() : List.of();
+        List<Transaction> incomeTransactions = personal
+                ? transactionRepository.findByWorkspaceOrAccounts(workspaceId, ownAccountIds, TransactionType.INCOME, startDate, endDate)
+                : transactionRepository.findTransactions(workspaceId, null, TransactionType.INCOME, null, startDate, endDate, null);
+        List<Transaction> expenseTransactions = personal
+                ? transactionRepository.findByWorkspaceOrAccounts(workspaceId, ownAccountIds, TransactionType.EXPENSE, startDate, endDate)
+                : transactionRepository.findTransactions(workspaceId, null, TransactionType.EXPENSE, null, startDate, endDate, null);
+
+        java.util.function.Function<Transaction, BigDecimal> inWsCurrency = t -> t.getAmount() != null
+                ? currencyConverter.convert(t.getAmount().amount(), t.getAmount().currency(), currency)
+                : BigDecimal.ZERO;
+
+        BigDecimal monthlyIncome = incomeTransactions.stream().map(inWsCurrency).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal monthlyExpenses = expenseTransactions.stream().map(inWsCurrency).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 3. Net Savings & Savings Rate
         BigDecimal netSavings = monthlyIncome.subtract(monthlyExpenses);
@@ -87,12 +105,12 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase {
         // 4. Essential vs Non-Essential Breakdown
         BigDecimal essentialExpenses = expenseTransactions.stream()
                 .filter(t -> t.getCategoryNature() == CategoryNature.ESSENTIAL)
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
+                .map(inWsCurrency)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal nonEssentialExpenses = expenseTransactions.stream()
                 .filter(t -> t.getCategoryNature() == CategoryNature.NON_ESSENTIAL)
-                .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
+                .map(inWsCurrency)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal essentialPercentage = BigDecimal.ZERO;
@@ -112,8 +130,7 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase {
         for (Transaction expense : expenseTransactions) {
             UUID catId = expense.getCategoryId();
             if (catId != null) {
-                BigDecimal amt = expense.getAmount() != null ? expense.getAmount().amount() : BigDecimal.ZERO;
-                categoryExpensesMap.merge(catId, amt, BigDecimal::add);
+                categoryExpensesMap.merge(catId, inWsCurrency.apply(expense), BigDecimal::add);
             }
         }
 
@@ -150,10 +167,13 @@ public class DashboardApplicationService implements GetDashboardSummaryUseCase {
         int exceededBudgetsCount = 0;
 
         for (Budget b : periodBudgets) {
-            BigDecimal budgetLimit = b.getAmount() != null ? b.getAmount().amount() : BigDecimal.ZERO;
+            BigDecimal budgetLimit = b.getAmount() != null
+                    ? currencyConverter.convert(b.getAmount().amount(), b.getAmount().currency(), currency)
+                    : BigDecimal.ZERO;
             BigDecimal catSpent = expenseTransactions.stream()
+                    .filter(t -> Objects.equals(t.getWorkspaceId(), workspaceId))
                     .filter(t -> b.getCategoryId() == null || Objects.equals(t.getCategoryId(), b.getCategoryId()))
-                    .map(t -> t.getAmount() != null ? t.getAmount().amount() : BigDecimal.ZERO)
+                    .map(inWsCurrency)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             if (catSpent.compareTo(budgetLimit) > 0) {

@@ -1,5 +1,11 @@
 package com.dualis.api.modules.analytics.application.service;
 
+import java.util.Optional;
+import com.dualis.api.modules.workspace.domain.model.WorkspaceType;
+import com.dualis.api.modules.workspace.domain.model.Workspace;
+import org.mockito.Spy;
+import com.dualis.api.modules.exchangerate.application.service.ExchangeRateApplicationService;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.account.domain.model.Account;
 import com.dualis.api.modules.account.domain.model.AccountStatus;
@@ -54,6 +60,10 @@ class DashboardApplicationServiceTest {
     @Mock
     private VerifyWorkspaceAccessUseCase workspaceAccess;
 
+    /** Real converter with the provider disabled: uses the built-in reference rates (PEN 3.75 per USD). */
+    @Spy
+    private ConvertCurrencyUseCase currencyConverter = new ExchangeRateApplicationService(java.util.Optional::empty);
+
     @InjectMocks
     private DashboardApplicationService dashboardService;
 
@@ -71,6 +81,7 @@ class DashboardApplicationServiceTest {
                 .type(AccountType.BANK)
                 .balance(Money.of(new BigDecimal("5000.00"), "USD"))
                 .status(AccountStatus.ACTIVE)
+                .isIncludedInTotal(true)
                 .createdAt(OffsetDateTime.now())
                 .build();
     }
@@ -78,7 +89,7 @@ class DashboardApplicationServiceTest {
     @Test
     @DisplayName("Should aggregate dashboard summary metrics correctly")
     void getDashboardSummary_Success() {
-        when(accountRepository.findByWorkspaceIdAndStatus(workspaceId, AccountStatus.ACTIVE)).thenReturn(List.of(account));
+        when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(account));
 
         Transaction income = Transaction.builder()
                 .id(UUID.randomUUID())
@@ -117,5 +128,46 @@ class DashboardApplicationServiceTest {
         assertThat(response.getNetSavings()).isEqualTo(new BigDecimal("2000.00"));
         assertThat(response.getSavingsRatePercentage()).isEqualTo(new BigDecimal("66.67"));
         assertThat(response.getEssentialExpenses()).isEqualTo(new BigDecimal("1000.00"));
+    }
+
+    @Test
+    @DisplayName("Personal dashboard converts currencies, skips excluded accounts and includes shared expenses paid from personal accounts")
+    void getDashboardSummary_PersonalMultiCurrency() {
+        Workspace personal = Workspace.builder().id(workspaceId).name("Personal").type(WorkspaceType.INDIVIDUAL)
+                .currency("PEN").ownerEmail("jorge@example.com").isActive(true).build();
+        Account usdSavings = Account.builder().id(UUID.randomUUID()).workspaceId(workspaceId).name("USD")
+                .type(AccountType.SAVINGS).balance(Money.of(new BigDecimal("100.00"), "USD"))
+                .status(AccountStatus.ACTIVE).isIncludedInTotal(true).createdAt(OffsetDateTime.now()).build();
+        Account penChecking = Account.builder().id(UUID.randomUUID()).workspaceId(workspaceId).name("PEN")
+                .type(AccountType.BANK).balance(Money.of(new BigDecimal("1000.00"), "PEN"))
+                .status(AccountStatus.ACTIVE).isIncludedInTotal(true).createdAt(OffsetDateTime.now()).build();
+        Account excluded = Account.builder().id(UUID.randomUUID()).workspaceId(workspaceId).name("Tarjeta")
+                .type(AccountType.BANK).balance(Money.of(new BigDecimal("-500.00"), "PEN"))
+                .status(AccountStatus.ACTIVE).isIncludedInTotal(false).createdAt(OffsetDateTime.now()).build();
+
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(personal));
+        when(accountRepository.findByWorkspaceId(workspaceId)).thenReturn(List.of(usdSavings, penChecking, excluded));
+
+        // 20 USD spent in the personal workspace + 150 PEN shared expense recorded in the couple workspace
+        Transaction usdExpense = Transaction.builder().id(UUID.randomUUID()).workspaceId(workspaceId)
+                .accountId(usdSavings.getId()).type(TransactionType.EXPENSE)
+                .amount(Money.of(new BigDecimal("20.00"), "USD")).createdAt(OffsetDateTime.now()).build();
+        Transaction sharedFromPersonal = Transaction.builder().id(UUID.randomUUID()).workspaceId(UUID.randomUUID())
+                .accountId(penChecking.getId()).type(TransactionType.EXPENSE)
+                .amount(Money.of(new BigDecimal("150.00"), "PEN")).createdAt(OffsetDateTime.now()).build();
+        when(transactionRepository.findByWorkspaceOrAccounts(eq(workspaceId), any(), eq(TransactionType.INCOME), any(), any()))
+                .thenReturn(List.of());
+        when(transactionRepository.findByWorkspaceOrAccounts(eq(workspaceId), any(), eq(TransactionType.EXPENSE), any(), any()))
+                .thenReturn(List.of(usdExpense, sharedFromPersonal));
+        when(categoryRepository.findByWorkspaceIdOrSystemDefault(workspaceId)).thenReturn(List.of());
+        when(budgetRepository.findByWorkspaceIdAndPeriodMonthAndPeriodYear(workspaceId, 11, 2026)).thenReturn(List.of());
+
+        DashboardSummaryResponse summary = dashboardService.getDashboardSummary(workspaceId, 11, 2026);
+
+        assertThat(summary.getCurrency()).isEqualTo("PEN");
+        // 100 USD * 3.75 + 1000 PEN (the excluded card is not counted)
+        assertThat(summary.getTotalBalance()).isEqualByComparingTo("1375.00");
+        // 20 USD * 3.75 + 150 PEN
+        assertThat(summary.getMonthlyExpenses()).isEqualByComparingTo("225.00");
     }
 }

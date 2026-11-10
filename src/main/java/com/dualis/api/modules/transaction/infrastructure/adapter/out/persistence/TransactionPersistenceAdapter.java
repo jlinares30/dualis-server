@@ -103,6 +103,21 @@ public class TransactionPersistenceAdapter implements TransactionRepositoryPort 
     }
 
     @Override
+    public List<Transaction> findByWorkspaceOrAccounts(
+            UUID workspaceId,
+            java.util.Collection<UUID> accountIds,
+            TransactionType type,
+            OffsetDateTime startDate,
+            OffsetDateTime endDate
+    ) {
+        Specification<TransactionJpaEntity> spec = TransactionSpecification.workspaceOrAccounts(workspaceId, accountIds)
+                .and(TransactionSpecification.filterTransactions(null, null, type, null, startDate, endDate, null));
+        return transactionRepository.findAll(spec).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public void delete(UUID id) {
         transactionRepository.deleteById(id);
     }

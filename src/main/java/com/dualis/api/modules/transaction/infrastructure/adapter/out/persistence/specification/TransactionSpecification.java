@@ -59,4 +59,15 @@ public class TransactionSpecification {
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    /** workspaceId = :workspaceId OR the primary account is one of :accountIds */
+    public static Specification<TransactionJpaEntity> workspaceOrAccounts(UUID workspaceId, java.util.Collection<UUID> accountIds) {
+        return (root, query, cb) -> {
+            Predicate inWorkspace = cb.equal(root.get("workspaceId"), workspaceId);
+            if (accountIds == null || accountIds.isEmpty()) {
+                return inWorkspace;
+            }
+            return cb.or(inWorkspace, root.get("account").get("id").in(accountIds));
+        };
+    }
 }

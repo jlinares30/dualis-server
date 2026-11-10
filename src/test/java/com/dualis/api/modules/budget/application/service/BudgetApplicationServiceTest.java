@@ -1,5 +1,8 @@
 package com.dualis.api.modules.budget.application.service;
 
+import org.mockito.Spy;
+import com.dualis.api.modules.exchangerate.application.service.ExchangeRateApplicationService;
+import com.dualis.api.modules.exchangerate.application.usecase.ConvertCurrencyUseCase;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.budget.domain.model.Budget;
 import com.dualis.api.modules.budget.domain.repository.BudgetRepositoryPort;
@@ -36,6 +39,10 @@ class BudgetApplicationServiceTest {
 
     @Mock
     private VerifyWorkspaceAccessUseCase workspaceAccess;
+
+    /** Real converter with the provider disabled: uses the built-in reference rates (PEN 3.75 per USD). */
+    @Spy
+    private ConvertCurrencyUseCase currencyConverter = new ExchangeRateApplicationService(java.util.Optional::empty);
 
     @InjectMocks
     private BudgetApplicationService budgetApplicationService;

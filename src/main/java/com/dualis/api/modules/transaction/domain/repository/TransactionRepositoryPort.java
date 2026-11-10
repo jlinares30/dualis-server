@@ -41,5 +41,17 @@ public interface TransactionRepositoryPort {
             String search
     );
 
+    /**
+     * Transactions of a workspace plus those (from any workspace) that move money from/to the given
+     * accounts, e.g. shared expenses paid with a personal account.
+     */
+    List<Transaction> findByWorkspaceOrAccounts(
+            UUID workspaceId,
+            java.util.Collection<UUID> accountIds,
+            TransactionType type,
+            OffsetDateTime startDate,
+            OffsetDateTime endDate
+    );
+
     void delete(UUID id);
 }
