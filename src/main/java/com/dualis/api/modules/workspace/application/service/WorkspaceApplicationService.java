@@ -118,6 +118,10 @@ public class WorkspaceApplicationService implements ManageWorkspaceUseCase {
 
         // A partner "deleting" the workspace only leaves it; it stays active for the owner.
         workspaceRepository.removeMember(id, email);
+        // The previous invitation code must not let anybody else in: issue a new one for the owner.
+        if (workspace.getType() == WorkspaceType.COUPLE) {
+            workspaceRepository.updateInvitationCode(id, generateUniqueInvitationCode());
+        }
     }
 
     @Override

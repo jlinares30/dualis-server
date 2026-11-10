@@ -20,6 +20,10 @@ public interface SpringDataWorkspaceRepository extends JpaRepository<WorkspaceJp
     List<WorkspaceJpaEntity> findWorkspacesByUserEmail(@Param("userEmail") String userEmail);
 
     @Modifying
+    @Query("UPDATE WorkspaceJpaEntity w SET w.invitationCode = :code, w.updatedAt = CURRENT_TIMESTAMP WHERE w.id = :workspaceId")
+    void updateInvitationCode(@Param("workspaceId") UUID workspaceId, @Param("code") String code);
+
+    @Modifying
     @Query("DELETE FROM WorkspaceMemberJpaEntity m WHERE m.workspace.id = :workspaceId AND LOWER(m.userEmail) = LOWER(:userEmail)")
     void deleteMember(@Param("workspaceId") UUID workspaceId, @Param("userEmail") String userEmail);
 }

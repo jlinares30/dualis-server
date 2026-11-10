@@ -49,6 +49,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepositoryPort {
     }
 
     @Override
+    public void updateInvitationCode(UUID workspaceId, String invitationCode) {
+        springDataWorkspaceRepository.updateInvitationCode(workspaceId, invitationCode);
+    }
+
+    @Override
     public void removeMember(UUID workspaceId, String userEmail) {
         springDataWorkspaceRepository.deleteMember(workspaceId, userEmail);
     }

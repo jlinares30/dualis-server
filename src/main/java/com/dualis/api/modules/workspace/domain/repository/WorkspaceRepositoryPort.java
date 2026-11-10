@@ -13,4 +13,5 @@ public interface WorkspaceRepositoryPort {
     List<Workspace> findWorkspacesByUserEmail(String userEmail);
     void delete(UUID id);
     void removeMember(UUID workspaceId, String userEmail);
+    void updateInvitationCode(UUID workspaceId, String invitationCode);
 }

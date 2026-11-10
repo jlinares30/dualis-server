@@ -1,5 +1,7 @@
 package com.dualis.api.modules.workspace.application.service;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import com.dualis.api.modules.workspace.application.usecase.VerifyWorkspaceAccessUseCase;
 import com.dualis.api.modules.auth.application.usecase.ManageAuthUseCase;
 import com.dualis.api.modules.workspace.domain.model.WorkspaceRole;
@@ -160,6 +162,8 @@ class WorkspaceApplicationServiceTest {
 
         assertThat(workspace.isActive()).isTrue();
         verify(workspaceRepository).removeMember(workspaceId, "maria@example.com");
+        // the old invitation code no longer lets anybody in
+        verify(workspaceRepository).updateInvitationCode(eq(workspaceId), argThat(code -> !"DUAL8X".equals(code)));
         verify(workspaceRepository, never()).save(any());
     }
 
