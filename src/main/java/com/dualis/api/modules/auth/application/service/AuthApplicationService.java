@@ -40,6 +40,11 @@ public class AuthApplicationService implements ManageAuthUseCase {
     private final AccountRepositoryPort accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final LoginAttemptService loginAttempts;
+
+    /** A session can be renewed while active, but never beyond this many days after login. */
+    @org.springframework.beans.factory.annotation.Value("${app.jwt.max-session-days:30}")
+    private long maxSessionDays = 30;
 
     @Override
     @Transactional
@@ -78,16 +83,19 @@ public class AuthApplicationService implements ManageAuthUseCase {
     @Override
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmailIgnoreCase(request.getEmail().toLowerCase().trim())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+        String email = request.getEmail().toLowerCase().trim();
+        loginAttempts.checkAllowed(email);
+
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            loginAttempts.recordFailure(email);
+            throw new IllegalArgumentException("Invalid email or password");
+        }
 
         if (!user.isActive()) {
             throw new IllegalArgumentException("Account is disabled");
         }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid email or password");
-        }
+        loginAttempts.recordSuccess(email);
 
         String token = jwtTokenProvider.generateToken(user.getEmail(), user.getRole().name());
 
@@ -238,5 +246,31 @@ public class AuthApplicationService implements ManageAuthUseCase {
             });
         }
         return names;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse refreshToken(String email, String currentToken) {
+        java.util.Date sessionStart = jwtTokenProvider.getSessionStart(currentToken);
+        long sessionAgeMs = System.currentTimeMillis() - sessionStart.getTime();
+        if (sessionAgeMs > java.time.Duration.ofDays(maxSessionDays).toMillis()) {
+            throw new org.springframework.security.authentication.CredentialsExpiredException(
+                    "Session expired, please log in again");
+        }
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .filter(User::isActive)
+                .orElseThrow(() -> new org.springframework.security.authentication.DisabledException("Account is not active"));
+
+        String token = jwtTokenProvider.generateToken(user.getEmail(), user.getRole().name(), sessionStart);
+        return AuthResponse.builder()
+                .accessToken(token)
+                .tokenType("Bearer")
+                .userId(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole().name())
+                .onboardingCompleted(user.isOnboardingCompleted())
+                .build();
     }
 }

@@ -55,6 +55,16 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token",
+            description = "Issues a new token for the authenticated user before the current one expires (max 30 days per login)")
+    public ResponseEntity<AuthResponse> refreshToken(
+            Authentication authentication,
+            @RequestHeader("Authorization") String authorization) {
+        String token = authorization.startsWith("Bearer ") ? authorization.substring(7) : authorization;
+        return ResponseEntity.ok(authService.refreshToken(authentication.getName(), token));
+    }
+
     @GetMapping("/me")
     @Operation(summary = "Get current user profile", description = "Retrieves profile details of the currently authenticated user from SecurityContext")
     @ApiResponses(value = {

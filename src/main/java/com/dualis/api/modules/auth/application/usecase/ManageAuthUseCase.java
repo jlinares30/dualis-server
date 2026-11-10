@@ -16,4 +16,7 @@ public interface ManageAuthUseCase {
 
     /** Display names (first + last name) of registered users, keyed by lower-case email. */
     java.util.Map<String, String> getDisplayNamesByEmail(java.util.Collection<String> emails);
+
+    /** Issues a fresh token for an authenticated user (sliding session, limited by app.jwt.max-session-days). */
+    AuthResponse refreshToken(String email, String currentToken);
 }

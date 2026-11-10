@@ -1,5 +1,8 @@
 package com.dualis.api.modules.auth.application.service;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import com.dualis.api.modules.auth.dto.request.LoginRequest;
 import com.dualis.api.modules.auth.dto.request.RegisterRequest;
 import com.dualis.api.modules.auth.dto.response.AuthResponse;
@@ -35,6 +38,9 @@ class AuthApplicationServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private LoginAttemptService loginAttempts;
 
     @InjectMocks
     private AuthApplicationService authApplicationService;
@@ -96,5 +102,17 @@ class AuthApplicationServiceTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("jwt_token_123");
+    }
+
+    @Test
+    @DisplayName("Blocked accounts are rejected before checking the password")
+    void login_Blocked_Rejected() {
+        doThrow(new com.dualis.api.exception.TooManyRequestsException("blocked", 600))
+                .when(loginAttempts).checkAllowed("jorge@example.com");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> authApplicationService.login(
+                        LoginRequest.builder().email("Jorge@Example.com").password("x").build()))
+                .isInstanceOf(com.dualis.api.exception.TooManyRequestsException.class);
+        verify(userRepository, never()).findByEmailIgnoreCase(any());
     }
 }

@@ -35,13 +35,22 @@ public class JwtTokenProvider {
         this.expirationInMs = expirationInMs;
     }
 
+    /** Claim with the instant (epoch seconds) the user logged in; kept when the token is refreshed. */
+    public static final String SESSION_START_CLAIM = "sst";
+
     public String generateToken(String email, String role) {
+        return generateToken(email, role, new Date());
+    }
+
+    /** Issues a token for a session that started at {@code sessionStart} (used by token refresh). */
+    public String generateToken(String email, String role, Date sessionStart) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationInMs);
 
         return Jwts.builder()
                 .subject(email)
                 .claim("role", role)
+                .claim(SESSION_START_CLAIM, sessionStart.getTime() / 1000)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -56,6 +65,16 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.getSubject();
+    }
+
+    /** When the session of this (valid) token started: the sst claim, or the issue date for older tokens. */
+    public Date getSessionStart(String token) {
+        Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        Object sst = claims.get(SESSION_START_CLAIM);
+        if (sst instanceof Number n) {
+            return new Date(n.longValue() * 1000);
+        }
+        return claims.getIssuedAt() != null ? claims.getIssuedAt() : new Date();
     }
 
     public boolean validateToken(String token) {
